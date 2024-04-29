@@ -146,42 +146,91 @@ class LeafNode extends BPlusNode {
     // See BPlusNode.get.
     @Override
     public LeafNode get(DataBox key) {
-        // TODO(proj2): implement
-
-        return null;
+        // TODO(proj2): implement DONE
+        return this;
     }
 
     // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf() {
-        // TODO(proj2): implement
-
-        return null;
+        // TODO(proj2): implement DONE
+        return this;
     }
 
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
-        // TODO(proj2): implement
+        // TODO(proj2): implement DONE
 
-        return Optional.empty();
+        int n = keys.size();
+        for (int i = 0; i < n + 1; i++) {
+            // 각 key 사이의 값에 해당하는 곳에 데이터 삽입. 중복된 값은 삽입 허용하지 않으므로 key와 같으면 안됨
+            if ((i == 0 || key.compareTo(keys.get(i - 1)) > 0) && (i == n || key.compareTo(keys.get(i)) < 0)) {
+                keys.add(i, key);
+                rids.add(i, rid);
+
+                int d = metadata.getOrder();
+                if (keys.size() > d * 2) { // overflow 발생했으므로 형제 생성 후 원래의 형제와의 사이에 끼워넣기
+                    List<DataBox> rightKeys = keys.subList(d, d * 2 + 1);
+                    List<RecordId> rightRids = rids.subList(d, d * 2 + 1);
+                    this.keys = keys.subList(0, d); // key 재생성
+                    this.rids = rids.subList(0, d); // rids 재생성
+
+                    LeafNode newSibling = new LeafNode(metadata, bufferManager, rightKeys, rightRids, rightSibling, treeContext);
+                    this.rightSibling = Optional.of(newSibling.getPage().getPageNum());
+
+                    sync();
+                    // split key와 함께 반환
+                    return Optional.of(new Pair<>(rightKeys.get(0), newSibling.getPage().getPageNum()));
+                }
+                sync(); // 이걸 해줘야지 testNoOverflowPutsFromDisk() 테스트 코드 통과 가능. 아마 버퍼를 최신 상태로 업데이트 하는 기능
+                return Optional.empty(); // overflow 아닌 삽입
+            }
+        }
+        throw new BPlusTreeException("중복된 삽입은 RookieDB에서 허용하지 않습니다.");
     }
 
     // See BPlusNode.bulkLoad.
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
             float fillFactor) {
-        // TODO(proj2): implement
+        // TODO(proj2): implement DONE
+        while (data.hasNext()) {
+            Pair<DataBox, RecordId> pair = data.next();
+            DataBox dataBox = pair.getFirst();
+            RecordId rid = pair.getSecond();
+            keys.add(dataBox);
+            rids.add(rid);
 
+            int d = metadata.getOrder();
+            if (keys.size() >= (fillFactor * 2 * d) + 1) { // 특정 구간에 도달하면 split
+                List<DataBox> rightKeys = keys.subList(keys.size() - 1, keys.size());
+                List<RecordId> rightRids = rids.subList(keys.size() - 1, keys.size());
+                this.keys = keys.subList(0, keys.size() - 1);
+                this.rids = rids.subList(0, keys.size());
+
+                LeafNode newSibling = new LeafNode(metadata, bufferManager, rightKeys, rightRids, Optional.empty(), treeContext);
+                this.rightSibling = Optional.of(newSibling.getPage().getPageNum());
+
+                sync();
+                // split key와 함께 반환
+                return Optional.of(new Pair<>(rightKeys.get(0), newSibling.getPage().getPageNum()));
+            }
+        }
+        sync();
         return Optional.empty();
     }
 
     // See BPlusNode.remove.
     @Override
     public void remove(DataBox key) {
-        // TODO(proj2): implement
-
-        return;
+        // TODO(proj2): implement DONE
+        if (keys.contains(key)) {
+            int index = keys.indexOf(key);
+            keys.remove(index);
+            rids.remove(index);
+            sync();
+        }
     }
 
     // Iterators ///////////////////////////////////////////////////////////////
@@ -372,12 +421,35 @@ class LeafNode extends BPlusNode {
      */
     public static LeafNode fromBytes(BPlusTreeMetadata metadata, BufferManager bufferManager,
                                      LockContext treeContext, long pageNum) {
-        // TODO(proj2): implement
+        // TODO(proj2): implement DONE
         // Note: LeafNode has two constructors. To implement fromBytes be sure to
         // use the constructor that reuses an existing page instead of fetching a
         // brand new one.
 
-        return null;
+        Page page = bufferManager.fetchPage(treeContext, pageNum);
+        Buffer buf = page.getBuffer();
+
+        byte nodeType = buf.get();
+        assert(nodeType == (byte) 1);
+
+        long pageId = buf.getLong();
+        Optional<Long> rightSibling = getRightSibling(pageId);
+        List<DataBox> keys = new ArrayList<>();
+        List<RecordId> rids = new ArrayList<>();
+        int n = buf.getInt();
+        for (int i = 0; i < n; i++) {
+            keys.add(DataBox.fromBytes(buf, metadata.getKeySchema()));
+            rids.add(RecordId.fromBytes(buf));
+        }
+
+        return new LeafNode(metadata, bufferManager, page, keys, rids, rightSibling, treeContext);
+    }
+
+    private static Optional<Long> getRightSibling(long pageId) {
+        if (pageId == -1L) {
+            return Optional.empty();
+        }
+        return Optional.of(pageId);
     }
 
     // Builtins ////////////////////////////////////////////////////////////////
