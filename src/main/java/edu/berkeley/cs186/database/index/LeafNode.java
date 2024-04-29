@@ -96,33 +96,52 @@ class LeafNode extends BPlusNode {
         return this;
     }
 
+    private void simplePut(DataBox key, RecordId rid) {
+        int index = InnerNode.numLessThan(key, keys);
+        keys.add(index, key);
+        rids.add(index, rid);
+    }
+
+    // Put ///////////////////////////////////////////////////////////////
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement Done
-        if(keys.contains(key)) throw new BPlusTreeException("Duplicate Put Try");
+        if (keys.contains(key)) throw new BPlusTreeException("Duplicate Put Try");
 
-        int index = InnerNode.numLessThan(key, keys);
-        this.keys.add(index, key);
-        this.rids.add(index, rid);
+        simplePut(key, rid);
 
         // overflow
         if(keys.size() == metadata.getOrder()*2 + 1){
             LeafNode newNode = split();
-            long newPageNum = newNode.getPage().getPageNum();
-            this.rightSibling = Optional.of(newPageNum);
-
-            // d + 1 번째 key 값이 새 인덱스가 됨
-            sync();
-            return Optional.of(new Pair<>(newNode.keys.get(0), newPageNum));
+            return promote(newNode);
         }
 
         sync();
         return Optional.empty();
     }
 
+    // See BPlusNode.bulkLoad.
+    @Override
+    public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data, float fillFactor) {
+        // TODO(proj2): implement Done
+        int maxRecords = (int) Math.ceil(fillFactor * metadata.getOrder() * 2);
+
+        while (data.hasNext() && keys.size() < maxRecords) {
+            Pair<DataBox, RecordId> next = data.next();
+            simplePut(next.getFirst(), next.getSecond());
+        }
+        sync();
+
+        if (!data.hasNext()) return Optional.empty();
+
+        LeafNode newNode = makeNode(data.next());
+        return promote(newNode);
+    }
+
     /**
      * 노드를 반 쪼개 새 노드를 만들어 반환
+     *
      * @return new LeafNode = this.rightSibling
      */
     private LeafNode split() {
@@ -135,41 +154,35 @@ class LeafNode extends BPlusNode {
         return new LeafNode(metadata, bufferManager, newKeys, newRids, rightSibling, treeContext); // newPage
     }
 
-    // See BPlusNode.bulkLoad.
-    @Override
-    public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data, float fillFactor) {
-        // TODO(proj2): implement Done
-         int maxRecords = (int)Math.ceil(fillFactor * metadata.getOrder() * 2);
+    private LeafNode makeNode(Pair<DataBox, RecordId> rest_data) {
+        List<DataBox> new_keys = new ArrayList<>();
+        List<RecordId> new_rids = new ArrayList<>();
+        new_keys.add(rest_data.getFirst());
+        new_rids.add(rest_data.getSecond());
 
-        while (data.hasNext() && keys.size() < maxRecords){
-            Pair<DataBox, RecordId> next = data.next();
-//            put(next.getFirst(), next.getSecond());
-            keys.add(next.getFirst());
-            rids.add(next.getSecond());
-        }
-
-        Optional<Pair<DataBox, Long>> newNodeInfo = Optional.empty();
-        if(data.hasNext()){
-            Pair<DataBox, RecordId> rest_data = data.next();
-            List<DataBox> new_keys = new ArrayList<>();
-            List<RecordId> new_rids = new ArrayList<>();
-            new_keys.add(rest_data.getFirst());
-            new_rids.add(rest_data.getSecond());
-
-            LeafNode newNode = new LeafNode(metadata, bufferManager, new_keys, new_rids, rightSibling, treeContext);
-            this.rightSibling = Optional.of(newNode.getPage().getPageNum());
-            newNodeInfo = Optional.of(new Pair<>(rest_data.getFirst(), newNode.getPage().getPageNum()));
-        }
-        sync();
-        return newNodeInfo;
+        return new LeafNode(metadata, bufferManager, new_keys, new_rids, rightSibling, treeContext);
     }
+
+    /**
+     * rightSibling을 바꾸고 promote 정보를 반환
+     *
+     * @param newNode New Node
+     * @return Promote Info
+     */
+    private Optional<Pair<DataBox, Long>> promote(LeafNode newNode) {
+        long pageNum = newNode.getPage().getPageNum();
+        this.rightSibling = Optional.of(pageNum);
+        sync();
+        return Optional.of(new Pair<>(newNode.getKeys().get(0), pageNum));
+    }
+
 
     // See BPlusNode.remove.
     @Override
     public void remove(DataBox key) {
         // TODO(proj2): implement Done
 
-        if(getKey(key).isPresent()) {
+        if (getKey(key).isPresent()) {
             rids.remove(getKey(key).get());
             keys.remove(key);
         }
@@ -387,7 +400,7 @@ class LeafNode extends BPlusNode {
         List<RecordId> rids = new ArrayList<>();
 
         int n = buf.getInt();
-        for (int i = 0; i < n ; ++i) {
+        for (int i = 0; i < n; ++i) {
             keys.add(DataBox.fromBytes(buf, metadata.getKeySchema()));
             rids.add(RecordId.fromBytes(buf));
         }

@@ -101,51 +101,50 @@ class InnerNode extends BPlusNode {
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement
         BPlusNode child = getChildByPageNum(children.get(numLessThanEqual(key, keys)));
-        Optional<Pair<DataBox, Long>> splitInfo = child.put(key, rid);
+        Optional<Pair<DataBox, Long>> promoteInfo = child.put(key, rid);
 
-        if (!splitInfo.isPresent()) return Optional.empty();
+        if (!promoteInfo.isPresent()) return promoteInfo;
 
-        // child overflow -> promote
-        Pair<DataBox, Long> info = splitInfo.get();
-        return putToThis(info.getFirst(), info.getSecond());
+        // overflow form child node -> put 'promoted node' to this
+        return putToThis(promoteInfo.get());
     }
 
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data, float fillFactor) {
         // TODO(proj2): implement
         BPlusNode rightMostChild = getChildByPageNum(children.get(children.size() - 1));
-        Optional<Pair<DataBox, Long>> promote = rightMostChild.bulkLoad(data, fillFactor);
+        Optional<Pair<DataBox, Long>> promoteInfo = rightMostChild.bulkLoad(data, fillFactor);
 
-        if (!promote.isPresent()) return promote;
+        // bulkLoad Fin.
+        if (!promoteInfo.isPresent()) return promoteInfo;
 
-        // overflow
-        DataBox newNode_key = promote.get().getFirst();
-        Long child = promote.get().getSecond();
-        Optional<Pair<DataBox, Long>> thisSplitInfo = putToThis(newNode_key, child);
+        // overflow from child node-> put 'promoted node' to this
+        Optional<Pair<DataBox, Long>> thisPromoteInfo = putToThis(promoteInfo.get());
 
-        if (!thisSplitInfo.isPresent()) return bulkLoad(data, fillFactor);
+        // overflow from this node
+        if (thisPromoteInfo.isPresent()) return thisPromoteInfo;
 
-        return thisSplitInfo;
+        return bulkLoad(data, fillFactor); // 한번 더
     }
 
-    private BPlusNode getChildByPageNum(long pageNum) {
-        return BPlusNode.fromBytes(metadata, bufferManager, treeContext, pageNum);
-    }
+    private Optional<Pair<DataBox, Long>> putToThis(Pair<DataBox, Long> promoteInfo) {
+        DataBox key = promoteInfo.getFirst();
+        Long child = promoteInfo.getSecond();
 
-    private Optional<Pair<DataBox, Long>> putToThis(DataBox key, Long child) {
         int index = InnerNode.numLessThan(key, keys);
         keys.add(index, key);
         children.add(index + 1, child);
 
-        if (keys.size() == metadata.getOrder() * 2 + 1) return split();
+        if (keys.size() == metadata.getOrder() * 2 + 1) return split(); // overflow
 
         sync();
         return Optional.empty();
     }
 
     private Optional<Pair<DataBox, Long>> split() {
-        // new node
         DataBox split_key = keys.get(metadata.getOrder());
+
+        // new node
         List<DataBox> new_keys = keys.subList(metadata.getOrder() + 1, keys.size());
         List<Long> new_children = children.subList(metadata.getOrder() + 1, children.size());
         InnerNode new_node = new InnerNode(metadata, bufferManager, new_keys, new_children, treeContext);
@@ -175,6 +174,10 @@ class InnerNode extends BPlusNode {
 
     private BPlusNode getChild(int i) {
         long pageNum = children.get(i);
+        return BPlusNode.fromBytes(metadata, bufferManager, treeContext, pageNum);
+    }
+
+    private BPlusNode getChildByPageNum(long pageNum) {
         return BPlusNode.fromBytes(metadata, bufferManager, treeContext, pageNum);
     }
 
