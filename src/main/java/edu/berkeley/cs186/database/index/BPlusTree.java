@@ -259,7 +259,8 @@ public class BPlusTree {
 
         // TODO(proj2): implement DONE
         Optional<Pair<DataBox, Long>> pairOptional = root.put(key, rid);
-        validateOverflow(pairOptional);
+        // overflow 발생했다면 전달받은 split key로 root 다시 설정
+        pairOptional.ifPresent(this::splitRoot);
     }
 
     /**
@@ -286,23 +287,21 @@ public class BPlusTree {
         // TODO(proj2): implement DONE
         while (data.hasNext()) {
             Optional<Pair<DataBox, Long>> pairOptional = root.bulkLoad(data, fillFactor);
-            validateOverflow(pairOptional);
+            pairOptional.ifPresent(this::splitRoot);
         }
     }
 
-    private void validateOverflow(Optional<Pair<DataBox, Long>> pairOptional) {
-        if (pairOptional.isPresent()) { // overflow 발생했다면 전달받은 split key로 root 다시 설정
-            Pair<DataBox, Long> pair = pairOptional.get();
-            DataBox dataBox = pair.getFirst();
-            Long pageNum = pair.getSecond();
+    private void splitRoot(Pair<DataBox, Long> pair) {
+        DataBox dataBox = pair.getFirst();
+        Long pageNum = pair.getSecond();
 
-            // 생성하면서 바로 초기화
-            List<DataBox> keys = new ArrayList<>(Collections.singletonList(dataBox));
-            List<Long> children = new ArrayList<>(Arrays.asList(root.getPage().getPageNum(), pageNum));
+        // 생성하면서 바로 초기화
+        List<DataBox> keys = new ArrayList<>(Collections.singletonList(dataBox));
+        List<Long> children = new ArrayList<>(Arrays.asList(root.getPage().getPageNum(), pageNum));
+        Collections.sort(children); // 순서대로 정렬
 
-            InnerNode newRoot = new InnerNode(metadata, bufferManager, keys, children, lockContext);
-            updateRoot(newRoot);
-        }
+        InnerNode newRoot = new InnerNode(metadata, bufferManager, keys, children, lockContext);
+        updateRoot(newRoot);
     }
 
     /**
