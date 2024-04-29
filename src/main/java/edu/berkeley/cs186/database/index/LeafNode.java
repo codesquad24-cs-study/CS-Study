@@ -187,27 +187,8 @@ class LeafNode extends BPlusNode {
             throw new BPlusTreeException("2d+1 초과");
         }
 
-        List<DataBox> newKeys = keys.subList(order, keys.size());
-        List<RecordId> newRecordIds = rids.subList(order, keys.size());
-
-        LeafNode newLeafNode = new LeafNode(
-            this.metadata,
-            this.bufferManager,
-            newKeys,
-            newRecordIds,
-            this.rightSibling,
-            this.treeContext
-        );
-
-        Long newPageNum = newLeafNode.getPage().getPageNum();
-
-        // 현재 키 업데이트
-        keys = keys.subList(0, order);
-        rids = rids.subList(0, order);
-        rightSibling = Optional.of(newPageNum);
-        sync();
-        return Optional.of(new Pair<>(newKeys.get(0), newPageNum));
-
+        //split
+        return split(order);
     }
 
     // See BPlusNode.bulkLoad.
@@ -251,6 +232,30 @@ class LeafNode extends BPlusNode {
         );
         sync();
         return Optional.of(new Pair<>(rightSiblingKey, leafNode.getPage().getPageNum()));
+    }
+
+    @Override
+    public Optional<Pair<DataBox, Long>> split(int index) {
+        List<DataBox> newKeys = keys.subList(index, keys.size());
+        List<RecordId> newRecordIds = rids.subList(index, keys.size());
+
+        LeafNode newLeafNode = new LeafNode(
+            this.metadata,
+            this.bufferManager,
+            newKeys,
+            newRecordIds,
+            this.rightSibling,
+            this.treeContext
+        );
+
+        Long newPageNum = newLeafNode.getPage().getPageNum();
+
+        // 현재 키 업데이트
+        keys = keys.subList(0, index);
+        rids = rids.subList(0, index);
+        rightSibling = Optional.of(newPageNum);
+        sync();
+        return Optional.of(new Pair<>(newKeys.get(0), newPageNum));
     }
 
     // See BPlusNode.remove.

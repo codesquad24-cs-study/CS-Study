@@ -245,22 +245,7 @@ public class BPlusTree {
 
         Pair<DataBox, Long> newRoot = pushNewNode.get();
 
-        DataBox pushKey = newRoot.getFirst();
-        Long pushPageNum = newRoot.getSecond();
-        List<DataBox> newKeys = new ArrayList<>();
-        List<Long> newChildren = new ArrayList<>();
-
-        newKeys.add(pushKey);
-        newChildren.add(root.getPage().getPageNum());
-        newChildren.add(pushPageNum);
-        InnerNode newRootNode = new InnerNode(
-            this.metadata,
-            this.bufferManager,
-            newKeys,
-            newChildren,
-            this.lockContext
-        );
-        updateRoot(newRootNode);
+        updateRootNode(Optional.of(newRoot));
     }
 
     /**
@@ -294,21 +279,7 @@ public class BPlusTree {
         while (data.hasNext()) {
             Optional<Pair<DataBox, Long>> pushInfo = root.bulkLoad(data, fillFactor);
             if (pushInfo.isPresent()) {
-                DataBox pushKey = pushInfo.get().getFirst();
-                Long pushPageNum = pushInfo.get().getSecond();
-                List<DataBox> newKeys = new ArrayList<>();
-                List<Long> newChildren = new ArrayList<>();
-                newKeys.add(pushKey);
-                newChildren.add(root.getPage().getPageNum());
-                newChildren.add(pushPageNum);
-                InnerNode newRootNode = new InnerNode(
-                    this.metadata,
-                    this.bufferManager,
-                    newKeys,
-                    newChildren,
-                    this.lockContext
-                );
-                updateRoot(newRootNode);
+                updateRootNode(pushInfo);
             }
 
         }
@@ -317,6 +288,24 @@ public class BPlusTree {
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
 
+    }
+
+    private void updateRootNode(Optional<Pair<DataBox, Long>> pushInfo) {
+        DataBox pushKey = pushInfo.get().getFirst();
+        Long pushPageNum = pushInfo.get().getSecond();
+        List<DataBox> newKeys = new ArrayList<>();
+        List<Long> newChildren = new ArrayList<>();
+        newKeys.add(pushKey);
+        newChildren.add(root.getPage().getPageNum());
+        newChildren.add(pushPageNum);
+        InnerNode newRootNode = new InnerNode(
+            this.metadata,
+            this.bufferManager,
+            newKeys,
+            newChildren,
+            this.lockContext
+        );
+        updateRoot(newRootNode);
     }
 
     /**
