@@ -147,9 +147,8 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): implement
-
-        return Optional.empty();
+        // TODO(proj2): implement Done
+        return root.get(key).getKey(key);
     }
 
     /**
@@ -255,12 +254,25 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): implement
+        // TODO(proj2): implement Done
         // Note: You should NOT update the root variable directly.
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
 
-        return;
+        Optional<Pair<DataBox, Long>> promote = root.put(key, rid);
+        promote.ifPresent(n -> splitRoot(promote.get()));
+    }
+
+    private void splitRoot(Pair<DataBox, Long> newRootInfo) {
+        List<DataBox> keys = new ArrayList<>();
+        List<Long> children = new ArrayList<>();
+
+        keys.add(newRootInfo.getFirst());
+        children.add(root.getPage().getPageNum()); // now root
+        children.add(newRootInfo.getSecond()); // new root
+
+        BPlusNode newRoot = new InnerNode(metadata, bufferManager, keys, children, lockContext);
+        updateRoot(newRoot);
     }
 
     /**
@@ -284,12 +296,15 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): implement
+        // TODO(proj2): implement Done
         // Note: You should NOT update the root variable directly.
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
 
-        return;
+        while (data.hasNext()) {
+            Optional<Pair<DataBox, Long>> promote = root.bulkLoad(data, fillFactor);
+            promote.ifPresent(n -> splitRoot(promote.get()));
+        }
     }
 
     /**
