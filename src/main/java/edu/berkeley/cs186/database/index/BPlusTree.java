@@ -283,12 +283,40 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): implement
+        // TODO(proj2): implement Done
+
+        // 1. tree가 empty인지 확인하기
+        LeafNode leftMostNode = root.getLeftmostLeaf();
+        if (leftMostNode.scanAll().hasNext()) {
+            throw new BPlusTreeException("Tree should be empty!!!!");
+        }
+
+        while (data.hasNext()) {
+            Optional<Pair<DataBox, Long>> pushInfo = root.bulkLoad(data, fillFactor);
+            if (pushInfo.isPresent()) {
+                DataBox pushKey = pushInfo.get().getFirst();
+                Long pushPageNum = pushInfo.get().getSecond();
+                List<DataBox> newKeys = new ArrayList<>();
+                List<Long> newChildren = new ArrayList<>();
+                newKeys.add(pushKey);
+                newChildren.add(root.getPage().getPageNum());
+                newChildren.add(pushPageNum);
+                InnerNode newRootNode = new InnerNode(
+                    this.metadata,
+                    this.bufferManager,
+                    newKeys,
+                    newChildren,
+                    this.lockContext
+                );
+                updateRoot(newRootNode);
+            }
+
+        }
+
         // Note: You should NOT update the root variable directly.
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
 
-        return;
     }
 
     /**
