@@ -442,37 +442,56 @@ public class BPlusTree {
         // TODO(proj2): Add whatever fields and constructors you want here. Done
         LeafNode node;
         Iterator<RecordId> iterator;
+        DataBox key;
 
         BPlusTreeIterator(LeafNode node) {
             this.node = node;
-            iterator = this.node.scanAll();
+            this.iterator = this.node.scanAll();
         }
 
         BPlusTreeIterator(LeafNode node, DataBox key) {
             this.node = node;
-            iterator = node.scanGreaterEqual(key);
+            this.key = key;
+            this.iterator = node.scanGreaterEqual(key);
         }
 
         @Override
         public boolean hasNext() {
-            // TODO(proj2): implement Done
-            if (iterator.hasNext()) return true;
-
-            // next node
-            Optional<LeafNode> rightSibling = node.getRightSibling();
-            if (!rightSibling.isPresent()) return false;
-
-            this.node = rightSibling.get();
-            this.iterator = node.scanAll();
-
-            return true;
+            // TODO(proj2): implement DONE
+            while (!iterator.hasNext()) {
+                Optional<LeafNode> siblingOptional = node.getRightSibling();
+                if (siblingOptional.isPresent()) { // 형제가 있다면 Iterator 다시 설정
+                    node = siblingOptional.get();
+                    if (key == null) {
+                        iterator = node.scanAll();
+                        continue;
+                    }
+                    iterator = node.scanGreaterEqual(key);
+                    continue;
+                }
+                break; // 형제가 없다면 현재 Iterator 유지
+            }
+            return iterator.hasNext();
         }
+
+//        @Override
+//        public boolean hasNext() {
+//            // TODO(proj2): implement Done
+//            if (iterator.hasNext()) return true;
+//
+//            // next node
+//            Optional<LeafNode> rightSibling = node.getRightSibling();
+//            if (!rightSibling.isPresent()) return false;
+//
+//            this.node = rightSibling.get();
+//            this.iterator = key != null ? node.scanGreaterEqual(key) : node.scanAll();
+//
+//            return true;
+//        }
 
         @Override
         public RecordId next() {
             // TODO(proj2): implement Done
-            if (!iterator.hasNext()) throw new NoSuchElementException();
-
             return iterator.next();
         }
     }
