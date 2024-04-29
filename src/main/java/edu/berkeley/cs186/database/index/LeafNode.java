@@ -14,19 +14,19 @@ import java.util.*;
 import javax.xml.crypto.Data;
 
 /**
- * A leaf of a B+ tree. Every leaf in a B+ tree of order d stores between d and
- * 2d (key, record id) pairs and a pointer to its right sibling (i.e. the page
- * number of its right sibling). Moreover, every leaf node is serialized and
- * persisted on a single page; see toBytes and fromBytes for details on how a
- * leaf is serialized. For example, here is an illustration of two order 2
- * leafs connected together:
- *
- *   leaf 1 (stored on some page)          leaf 2 (stored on some other page)
- *   +-------+-------+-------+-------+     +-------+-------+-------+-------+
- *   | k0:r0 | k1:r1 | k2:r2 |       | --> | k3:r3 | k4:r4 |       |       |
- *   +-------+-------+-------+-------+     +-------+-------+-------+-------+
+ * A leaf of a B+ tree. Every leaf in a B+ tree of order d stores between d and 2d (key, record id)
+ * pairs and a pointer to its right sibling (i.e. the page number of its right sibling). Moreover,
+ * every leaf node is serialized and persisted on a single page; see toBytes and fromBytes for
+ * details on how a leaf is serialized. For example, here is an illustration of two order 2 leafs
+ * connected together:
+ * <p>
+ * leaf 1 (stored on some page)          leaf 2 (stored on some other page)
+ * +-------+-------+-------+-------+     +-------+-------+-------+-------+ | k0:r0 | k1:r1 | k2:r2 |
+ * | --> | k3:r3 | k4:r4 |       |       | +-------+-------+-------+-------+
+ * +-------+-------+-------+-------+
  */
 class LeafNode extends BPlusNode {
+
     // Metadata about the B+ tree that this node belongs to.
     private BPlusTreeMetadata metadata;
 
@@ -107,24 +107,25 @@ class LeafNode extends BPlusNode {
     private Optional<Long> rightSibling;
 
     // Constructors ////////////////////////////////////////////////////////////
+
     /**
-     * Construct a brand new leaf node. This constructor will fetch a new pinned
-     * page from the provided BufferManager `bufferManager` and persist the node
-     * to that page.
+     * Construct a brand new leaf node. This constructor will fetch a new pinned page from the
+     * provided BufferManager `bufferManager` and persist the node to that page.
      */
     LeafNode(BPlusTreeMetadata metadata, BufferManager bufferManager, List<DataBox> keys,
-             List<RecordId> rids, Optional<Long> rightSibling, LockContext treeContext) {
-        this(metadata, bufferManager, bufferManager.fetchNewPage(treeContext, metadata.getPartNum()),
-             keys, rids,
-             rightSibling, treeContext);
+        List<RecordId> rids, Optional<Long> rightSibling, LockContext treeContext) {
+        this(metadata, bufferManager,
+            bufferManager.fetchNewPage(treeContext, metadata.getPartNum()),
+            keys, rids,
+            rightSibling, treeContext);
     }
 
     /**
      * Construct a leaf node that is persisted to page `page`.
      */
     private LeafNode(BPlusTreeMetadata metadata, BufferManager bufferManager, Page page,
-                     List<DataBox> keys,
-                     List<RecordId> rids, Optional<Long> rightSibling, LockContext treeContext) {
+        List<DataBox> keys,
+        List<RecordId> rids, Optional<Long> rightSibling, LockContext treeContext) {
         try {
             assert (keys.size() == rids.size());
             assert (keys.size() <= 2 * metadata.getOrder());
@@ -177,42 +178,42 @@ class LeafNode extends BPlusNode {
         int order = metadata.getOrder();
         int maximumKeySize = 2 * order;
 
-
-            // case1. leaf is not full
+        // keySize 가 2*d 이하일때
         if (keys.size() <= maximumKeySize) {
             sync();
             return Optional.empty();
-            // case2. full 일때
-        } else if (keys.size() > maximumKeySize) {
-            List<DataBox> newKeys = keys.subList(order, keys.size());
-            List<RecordId> newRecordIds = rids.subList(order, rids.size());
-
-            LeafNode newLeafNode = new LeafNode(
-                this.metadata,
-                this.bufferManager,
-                newKeys,
-                newRecordIds,
-                this.rightSibling,
-                this.treeContext
-            );
-
-            Long newPageNum = newLeafNode.getPage().getPageNum();
-
-            // 현재 키 업데이트
-            keys = keys.subList(0, order);
-            rids = rids.subList(0, order);
-            rightSibling = Optional.of(newPageNum);
-            sync();
-            return Optional.of(new Pair<>(newKeys.get(0), newPageNum));
+        }
+        if (keys.size() > maximumKeySize + 1) {
+            throw new BPlusTreeException("2d+1 초과");
         }
 
-        return Optional.empty();
+        List<DataBox> newKeys = keys.subList(order, keys.size());
+        List<RecordId> newRecordIds = rids.subList(order, keys.size());
+
+        LeafNode newLeafNode = new LeafNode(
+            this.metadata,
+            this.bufferManager,
+            newKeys,
+            newRecordIds,
+            this.rightSibling,
+            this.treeContext
+        );
+
+        Long newPageNum = newLeafNode.getPage().getPageNum();
+
+        // 현재 키 업데이트
+        keys = keys.subList(0, order);
+        rids = rids.subList(0, order);
+        rightSibling = Optional.of(newPageNum);
+        sync();
+        return Optional.of(new Pair<>(newKeys.get(0), newPageNum));
+
     }
 
     // See BPlusNode.bulkLoad.
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
-            float fillFactor) {
+        float fillFactor) {
         // TODO(proj2): implement
 
         return Optional.empty();
@@ -231,24 +232,27 @@ class LeafNode extends BPlusNode {
     }
 
     // Iterators ///////////////////////////////////////////////////////////////
-    /** Return the record id associated with `key`. */
+
+    /**
+     * Return the record id associated with `key`.
+     */
     Optional<RecordId> getKey(DataBox key) {
         int index = keys.indexOf(key);
         return index == -1 ? Optional.empty() : Optional.of(rids.get(index));
     }
 
     /**
-     * Returns an iterator over the record ids of this leaf in ascending order of
-     * their corresponding keys.
+     * Returns an iterator over the record ids of this leaf in ascending order of their
+     * corresponding keys.
      */
     Iterator<RecordId> scanAll() {
         return rids.iterator();
     }
 
     /**
-     * Returns an iterator over the record ids of this leaf that have a
-     * corresponding key greater than or equal to `key`. The record ids are
-     * returned in ascending order of their corresponding keys.
+     * Returns an iterator over the record ids of this leaf that have a corresponding key greater
+     * than or equal to `key`. The record ids are returned in ascending order of their corresponding
+     * keys.
      */
     Iterator<RecordId> scanGreaterEqual(DataBox key) {
         int index = InnerNode.numLessThan(key, keys);
@@ -261,7 +265,9 @@ class LeafNode extends BPlusNode {
         return page;
     }
 
-    /** Returns the right sibling of this leaf, if it has one. */
+    /**
+     * Returns the right sibling of this leaf, if it has one.
+     */
     Optional<LeafNode> getRightSibling() {
         if (!rightSibling.isPresent()) {
             return Optional.empty();
@@ -271,7 +277,9 @@ class LeafNode extends BPlusNode {
         return Optional.of(LeafNode.fromBytes(metadata, bufferManager, treeContext, pageNum));
     }
 
-    /** Serializes this leaf to its page. */
+    /**
+     * Serializes this leaf to its page.
+     */
     private void sync() {
         page.pin();
         try {
@@ -298,8 +306,8 @@ class LeafNode extends BPlusNode {
     }
 
     /**
-     * Returns the largest number d such that the serialization of a LeafNode
-     * with 2d entries will fit on a single page.
+     * Returns the largest number d such that the serialization of a LeafNode with 2d entries will
+     * fit on a single page.
      */
     static int maxOrder(short pageSize, Type keySchema) {
         // A leaf node with n entries takes up the following number of bytes:
@@ -335,7 +343,7 @@ class LeafNode extends BPlusNode {
     public String toString() {
         String rightSibString = rightSibling.map(Object::toString).orElse("None");
         return String.format("LeafNode(pageNum=%s, keys=%s, rids=%s, rightSibling=%s)",
-                page.getPageNum(), keys, rids, rightSibString);
+            page.getPageNum(), keys, rids, rightSibString);
     }
 
     @Override
@@ -350,10 +358,10 @@ class LeafNode extends BPlusNode {
     }
 
     /**
-     * Given a leaf with page number 1 and three (key, rid) pairs (0, (0, 0)),
-     * (1, (1, 1)), and (2, (2, 2)), the corresponding dot fragment is:
-     *
-     *   node1[label = "{0: (0 0)|1: (1 1)|2: (2 2)}"];
+     * Given a leaf with page number 1 and three (key, rid) pairs (0, (0, 0)), (1, (1, 1)), and (2,
+     * (2, 2)), the corresponding dot fragment is:
+     * <p>
+     * node1[label = "{0: (0 0)|1: (1 1)|2: (2 2)}"];
      */
     @Override
     public String toDot() {
@@ -417,14 +425,14 @@ class LeafNode extends BPlusNode {
      * Loads a leaf node from page `pageNum`.
      */
     public static LeafNode fromBytes(BPlusTreeMetadata metadata, BufferManager bufferManager,
-                                     LockContext treeContext, long pageNum) {
+        LockContext treeContext, long pageNum) {
         // TODO(proj2): Done
         Page page = bufferManager.fetchPage(treeContext, pageNum);
         Buffer buffer = page.getBuffer();
 
         // a. node type
         byte nodeType = buffer.get();
-        assert(nodeType == (byte) 1);
+        assert (nodeType == (byte) 1);
 
         // b. page id of right sibling
         long rightSiblingId = buffer.getLong();
@@ -449,7 +457,8 @@ class LeafNode extends BPlusNode {
         // use the constructor that reuses an existing page instead of fetching a
         // brand new one.
 
-        return new LeafNode(metadata, bufferManager, page, keys, recordIds, rightSibling, treeContext);
+        return new LeafNode(metadata, bufferManager, page, keys, recordIds, rightSibling,
+            treeContext);
     }
 
     // Builtins ////////////////////////////////////////////////////////////////
@@ -463,9 +472,9 @@ class LeafNode extends BPlusNode {
         }
         LeafNode n = (LeafNode) o;
         return page.getPageNum() == n.page.getPageNum() &&
-               keys.equals(n.keys) &&
-               rids.equals(n.rids) &&
-               rightSibling.equals(n.rightSibling);
+            keys.equals(n.keys) &&
+            rids.equals(n.rids) &&
+            rightSibling.equals(n.rightSibling);
     }
 
     @Override
