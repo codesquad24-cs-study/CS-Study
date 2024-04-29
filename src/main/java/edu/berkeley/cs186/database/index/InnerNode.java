@@ -129,28 +129,8 @@ class InnerNode extends BPlusNode {
             return Optional.empty();
         }
 
-        DataBox indexx = keys.get(order);
-        // split
-        List<DataBox> leftKeys = keys.subList(0, order);
-        List<DataBox> rightKeys = keys.subList(order + 1, keys.size());
-
-        List<Long> leftChildren = children.subList(0, order + 1);
-        List<Long> rightChildren = children.subList(order + 1, children.size());
-
-        InnerNode newInnerNode = new InnerNode(
-            this.metadata,
-            this.bufferManager,
-            rightKeys,
-            rightChildren,
-            this.treeContext
-        );
-
-        // 현재 키 업데이트
-        keys = leftKeys;
-        children = leftChildren;
-        sync();
-        return Optional.of(new Pair<>(indexx, newInnerNode.getPage().getPageNum()));
-
+        //split
+        return split(order);
     }
 
     // See BPlusNode.bulkLoad.
@@ -176,26 +156,32 @@ class InnerNode extends BPlusNode {
         }
 
         //split
-        DataBox splitIndex = keys.get(order);
-        List<DataBox> leftKeys = keys.subList(0, order);
-        List<DataBox> rightKeys = keys.subList(order + 1, keys.size());
+        return split(order);
+    }
 
-        List<Long> leftChildren = children.subList(0, order + 1);
-        List<Long> rightChildren = children.subList(order + 1, children.size());
 
-        InnerNode innerNode = new InnerNode(
+    @Override
+    public Optional<Pair<DataBox, Long>> split(int index) {
+        DataBox splitIndex = keys.get(index);
+        List<DataBox> leftKeys = keys.subList(0, index);
+        List<DataBox> rightKeys = keys.subList(index + 1, keys.size());
+
+        List<Long> leftChildren = children.subList(0, index + 1);
+        List<Long> rightChildren = children.subList(index + 1, children.size());
+
+        InnerNode newInnerNode = new InnerNode(
             this.metadata,
             this.bufferManager,
             rightKeys,
             rightChildren,
             this.treeContext
         );
-
         keys = leftKeys;
         children = leftChildren;
         sync();
-        return Optional.of(new Pair<>(splitIndex, innerNode.getPage().getPageNum()));
+        return Optional.of(new Pair<>(splitIndex, newInnerNode.getPage().getPageNum()));
     }
+
 
     // See BPlusNode.remove.
     @Override
