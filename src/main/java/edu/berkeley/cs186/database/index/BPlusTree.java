@@ -460,34 +460,13 @@ public class BPlusTree {
             // TODO(proj2): implement DONE
             while (!iterator.hasNext()) {
                 Optional<LeafNode> siblingOptional = node.getRightSibling();
-                if (siblingOptional.isPresent()) { // 형제가 있다면 Iterator 다시 설정
-                    node = siblingOptional.get();
-                    if (key == null) {
-                        iterator = node.scanAll();
-                        continue;
-                    }
-                    iterator = node.scanGreaterEqual(key);
-                    continue;
-                }
-                break; // 형제가 없다면 현재 Iterator 유지
+                if (!siblingOptional.isPresent()) break; // 형제가 없다면 현재 Iterator 유지
+
+                node = siblingOptional.get();
+                this.iterator = key != null ? node.scanGreaterEqual(key) : node.scanAll();
             }
             return iterator.hasNext();
         }
-
-//        @Override
-//        public boolean hasNext() {
-//            // TODO(proj2): implement Done
-//            if (iterator.hasNext()) return true;
-//
-//            // next node
-//            Optional<LeafNode> rightSibling = node.getRightSibling();
-//            if (!rightSibling.isPresent()) return false;
-//
-//            this.node = rightSibling.get();
-//            this.iterator = key != null ? node.scanGreaterEqual(key) : node.scanAll();
-//
-//            return true;
-//        }
 
         @Override
         public RecordId next() {
