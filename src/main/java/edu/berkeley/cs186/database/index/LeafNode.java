@@ -11,6 +11,7 @@ import edu.berkeley.cs186.database.table.RecordId;
 
 import java.nio.ByteBuffer;
 import java.util.*;
+import javax.xml.crypto.Data;
 
 /**
  * A leaf of a B+ tree. Every leaf in a B+ tree of order d stores between d and
@@ -146,23 +147,64 @@ class LeafNode extends BPlusNode {
     // See BPlusNode.get.
     @Override
     public LeafNode get(DataBox key) {
-        // TODO(proj2): implement
+        // TODO(proj2): Done
 
-        return null;
+        return this;
     }
 
     // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf() {
-        // TODO(proj2): implement
+        // TODO(proj2): Done
 
-        return null;
+        return this;
     }
 
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
-        // TODO(proj2): implement
+        // TODO(proj2): Done
+
+        // 중복키이면 예외
+        if (keys.contains(key)) {
+            throw new BPlusTreeException("Duplicate key");
+        }
+
+        int index = InnerNode.numLessThan(key, keys);
+        keys.add(index, key);
+        rids.add(index, rid);
+
+        int order = metadata.getOrder();
+        int maximumKeySize = 2 * order;
+
+
+            // case1. leaf is not full
+        if (keys.size() <= maximumKeySize) {
+            sync();
+            return Optional.empty();
+            // case2. full 일때
+        } else if (keys.size() > maximumKeySize) {
+            List<DataBox> newKeys = keys.subList(order, keys.size());
+            List<RecordId> newRecordIds = rids.subList(order, rids.size());
+
+            LeafNode newLeafNode = new LeafNode(
+                this.metadata,
+                this.bufferManager,
+                newKeys,
+                newRecordIds,
+                this.rightSibling,
+                this.treeContext
+            );
+
+            Long newPageNum = newLeafNode.getPage().getPageNum();
+
+            // 현재 키 업데이트
+            keys = keys.subList(0, order);
+            rids = rids.subList(0, order);
+            rightSibling = Optional.of(newPageNum);
+            sync();
+            return Optional.of(new Pair<>(newKeys.get(0), newPageNum));
+        }
 
         return Optional.empty();
     }
@@ -179,9 +221,13 @@ class LeafNode extends BPlusNode {
     // See BPlusNode.remove.
     @Override
     public void remove(DataBox key) {
-        // TODO(proj2): implement
-
-        return;
+        // TODO(proj2): Done
+        if (keys.contains(key)) {
+            int index = keys.indexOf(key);
+            keys.remove(index);
+            rids.remove(index);
+            sync();
+        }
     }
 
     // Iterators ///////////////////////////////////////////////////////////////
@@ -372,12 +418,13 @@ class LeafNode extends BPlusNode {
      */
     public static LeafNode fromBytes(BPlusTreeMetadata metadata, BufferManager bufferManager,
                                      LockContext treeContext, long pageNum) {
-        // TODO(proj2): implement
+        // TODO(proj2): Done
         Page page = bufferManager.fetchPage(treeContext, pageNum);
         Buffer buffer = page.getBuffer();
 
         // a. node type
         byte nodeType = buffer.get();
+        assert(nodeType == (byte) 1);
 
         // b. page id of right sibling
         long rightSiblingId = buffer.getLong();

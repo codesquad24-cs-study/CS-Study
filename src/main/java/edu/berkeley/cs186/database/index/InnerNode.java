@@ -80,26 +80,75 @@ class InnerNode extends BPlusNode {
     // See BPlusNode.get.
     @Override
     public LeafNode get(DataBox key) {
-        // TODO(proj2): implement
+        // TODO(proj2): Done
+        // 1. 작거나 같은 index 찾기
+        int index = numLessThanEqual(key, this.keys);
 
-        return null;
+        // 2. index 찾고 child 조회
+        BPlusNode child = getChild(index);
+        return child.get(key);
     }
 
     // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf() {
         assert(children.size() > 0);
-        // TODO(proj2): implement
-
-        return null;
+        // TODO(proj2): Done
+        BPlusNode currentNode = this;
+        while (currentNode instanceof InnerNode) {
+            currentNode = ((InnerNode) currentNode).getChild(0);
+        }
+        return (LeafNode) currentNode;
     }
 
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
-        // TODO(proj2): implement
+        // TODO(proj2): Done
+        int index = numLessThanEqual(key, this.keys);
+        BPlusNode child = getChild(index);
+        Optional<Pair<DataBox, Long>> putResult = child.put(key, rid);
+        // 자식 노드가 split 하는지 확인
+        if (putResult.isEmpty()) {
+            return Optional.empty();
+        }
 
-        return Optional.empty();
+        // push 정보
+        Pair<DataBox, Long> pushPair = putResult.get();
+        int order = metadata.getOrder();
+
+        DataBox pushKey = pushPair.getFirst();
+        Long pushPageNum = pushPair.getSecond();
+        keys.add(index, pushKey);
+        children.add(index + 1, pushPageNum);
+
+        if (keys.size() <= 2 * order + 1) {
+            sync();
+            return Optional.empty();
+        }
+
+        // split
+        List<DataBox> leftKeys = keys.subList(0, index);
+        List<DataBox> rightKeys = keys.subList(index + 1, keys.size());
+
+        List<Long> leftChildren = children.subList(0, index + 1);
+        List<Long> rightChildren = children.subList(index + 1, children.size());
+
+        InnerNode newInnerNode = new InnerNode(
+            this.metadata,
+            this.bufferManager,
+            rightKeys,
+            rightChildren,
+            this.treeContext
+        );
+
+
+        // 현재 키 업데이트
+        keys = leftKeys;
+        children = leftChildren;
+        sync();
+        return Optional.of(new Pair<>(keys.get(index), newInnerNode.getPage().getPageNum()));
+
     }
 
     // See BPlusNode.bulkLoad.
@@ -114,9 +163,8 @@ class InnerNode extends BPlusNode {
     // See BPlusNode.remove.
     @Override
     public void remove(DataBox key) {
-        // TODO(proj2): implement
-
-        return;
+        // TODO(proj2): Done
+        get(key).remove(key);
     }
 
     // Helpers /////////////////////////////////////////////////////////////////
