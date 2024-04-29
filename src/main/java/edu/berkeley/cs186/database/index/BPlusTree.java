@@ -15,6 +15,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.*;
+import javax.swing.text.html.Option;
 
 /**
  * A persistent B+ tree.
@@ -145,9 +146,14 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): implement
+        // TODO(proj2): Done;
 
-        return Optional.empty();
+        // 1. Leaf 노드 구하기
+        LeafNode leafNode = root.get(key);
+
+        //2. recordId 구하기
+
+        return leafNode.getKey(key);
     }
 
     /**
@@ -257,8 +263,30 @@ public class BPlusTree {
         // Note: You should NOT update the root variable directly.
         // Use the provided updateRoot() helper method to change
         // the tree's root if the old root splits.
+        Optional<Pair<DataBox, Long>> pushNewNode = root.put(key, rid);
+        if (pushNewNode.isEmpty()) {
+            return;
+        }
 
-        return;
+        Pair<DataBox, Long> newRoot = pushNewNode.get();
+
+        DataBox pushKey = newRoot.getFirst();
+        Long pushPageNum = newRoot.getSecond();
+        List<DataBox> newKeys = new ArrayList<>();
+        List<Long> newChildren = new ArrayList<>();
+
+        newKeys.add(pushKey);
+        newChildren.add(root.getPage().getPageNum());
+        newChildren.add(pushPageNum);
+        InnerNode newRootNode = new InnerNode(
+            this.metadata,
+            this.bufferManager,
+            newKeys,
+            newChildren,
+            this.lockContext
+        );
+        updateRoot(newRootNode);
+
     }
 
     /**
@@ -306,9 +334,8 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): implement
-
-        return;
+        // TODO(proj2): Done
+        root.remove(key);
     }
 
     // Helpers /////////////////////////////////////////////////////////////////
