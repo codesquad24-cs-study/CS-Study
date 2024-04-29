@@ -80,25 +80,53 @@ class InnerNode extends BPlusNode {
     // See BPlusNode.get.
     @Override
     public LeafNode get(DataBox key) {
-        // TODO(proj2): implement
-
-        return null;
+        // TODO(proj2): implement DONE
+        int index = numLessThanEqual(key, keys);
+        return getChild(index).get(key); // 자식 찾기
     }
 
     // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf() {
         assert(children.size() > 0);
-        // TODO(proj2): implement
-
-        return null;
+        // TODO(proj2): implement DONE
+        BPlusNode child = getChild(0); // 제일 왼쪽 자식 찾기
+        return child.getLeftmostLeaf();
     }
 
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
-        // TODO(proj2): implement
+        // TODO(proj2): implement DONE
+        BPlusNode child = getChildByPageNum(children.get(numLessThanEqual(key, keys)));
+        Optional<Pair<DataBox, Long>> pairOptional = child.put(key, rid);
 
+        if (pairOptional.isPresent()) { // 존재하면 overflow 발생한 것이므로 split key를 inner에 껴줘야 함.
+            Pair<DataBox, Long> pair = pairOptional.get();
+            DataBox dataBox = pair.getFirst();
+            Long pageNum = pair.getSecond();
+
+            int index = InnerNode.numLessThan(dataBox, keys);
+            keys.add(index, dataBox);
+            children.add(index + 1, pageNum);
+
+            int d = metadata.getOrder();
+            if (keys.size() == 2 * d + 1) { // overflow 발생했으므로 형제 생성 후 원래의 형제와의 사이에 끼워넣기
+                DataBox splitKey = keys.get(d);
+                List<DataBox> rightKeys = keys.subList(d + 1, keys.size());
+                List<Long> rightChildren = children.subList(d + 1, children.size());
+                InnerNode innerNode = new InnerNode(metadata, bufferManager, rightKeys, rightChildren, treeContext);
+
+                keys = keys.subList(0, d);
+                children = children.subList(0, d + 1);
+
+                sync();
+                return Optional.of(new Pair<>(splitKey, innerNode.getPage().getPageNum()));
+            }
+            sync();
+            return Optional.empty();
+        }
+        sync();
         return Optional.empty();
     }
 
@@ -106,17 +134,48 @@ class InnerNode extends BPlusNode {
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
             float fillFactor) {
-        // TODO(proj2): implement
+        // TODO(proj2): implement DONE
+        while (data.hasNext()) {
+            BPlusNode rightMostChild = getChildByPageNum(children.get(children.size() - 1));
+            Optional<Pair<DataBox, Long>> pairOptional = rightMostChild.bulkLoad(data, fillFactor);
 
+            if (pairOptional.isPresent()) {
+                Pair<DataBox, Long> pair = pairOptional.get();
+                DataBox dataBox = pair.getFirst();
+                Long pageNum = pair.getSecond();
+
+                int index = InnerNode.numLessThan(dataBox, keys);
+                keys.add(index, dataBox);
+                children.add(index + 1, pageNum);
+
+                int d = metadata.getOrder();
+                if (keys.size() >= 2 * d + 1) {
+                    List<DataBox> rightKeys = keys.subList(d, d * 2 + 1);
+                    List<Long> rightChildren = children.subList(d, d * 2 + 2);
+                    DataBox splitKey = keys.get(d - 1);
+                    keys = keys.subList(0, d - 1);
+                    children = children.subList(0, d);
+                    InnerNode innerNode = new InnerNode(metadata, bufferManager, rightKeys, rightChildren, treeContext);
+
+                    sync();
+                    // split key와 함께 반환
+                    return Optional.of(new Pair<>(splitKey, innerNode.getPage().getPageNum()));
+                }
+                sync();
+                return Optional.empty(); // overflow 아닌 삽입
+            }
+            return pairOptional;
+        }
+        sync();
         return Optional.empty();
     }
 
     // See BPlusNode.remove.
     @Override
     public void remove(DataBox key) {
-        // TODO(proj2): implement
-
-        return;
+        // TODO(proj2): implement DONE
+        LeafNode leafNode = get(key);
+        leafNode.remove(key);
     }
 
     // Helpers /////////////////////////////////////////////////////////////////
@@ -127,6 +186,10 @@ class InnerNode extends BPlusNode {
 
     private BPlusNode getChild(int i) {
         long pageNum = children.get(i);
+        return BPlusNode.fromBytes(metadata, bufferManager, treeContext, pageNum);
+    }
+
+    private BPlusNode getChildByPageNum(long pageNum) {
         return BPlusNode.fromBytes(metadata, bufferManager, treeContext, pageNum);
     }
 
