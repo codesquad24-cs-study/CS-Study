@@ -260,7 +260,7 @@ public class BPlusTree {
         // the tree's root if the old root splits.
 
         Optional<Pair<DataBox, Long>> promote = root.put(key, rid);
-        promote.ifPresent(n -> splitRoot(promote.get()));
+        promote.ifPresent(this::splitRoot);
     }
 
     private void splitRoot(Pair<DataBox, Long> newRootInfo) {
@@ -303,7 +303,7 @@ public class BPlusTree {
 
         while (data.hasNext()) {
             Optional<Pair<DataBox, Long>> promote = root.bulkLoad(data, fillFactor);
-            promote.ifPresent(n -> splitRoot(promote.get()));
+            promote.ifPresent(this::splitRoot);
         }
     }
 
