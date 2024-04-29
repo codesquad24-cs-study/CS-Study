@@ -203,9 +203,9 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): Return a BPlusTreeIterator.
+        // TODO(proj2): Return a BPlusTreeIterator. Done
 
-        return Collections.emptyIterator();
+        return new BPlusTreeIterator(root.getLeftmostLeaf());
     }
 
     /**
@@ -236,9 +236,9 @@ public class BPlusTree {
         // TODO(proj4_integration): Update the following line
         LockUtil.ensureSufficientLockHeld(lockContext, LockType.NL);
 
-        // TODO(proj2): Return a BPlusTreeIterator.
+        // TODO(proj2): Return a BPlusTreeIterator. Done
 
-        return Collections.emptyIterator();
+        return new BPlusTreeIterator(root.getLeftmostLeaf(), key);
     }
 
     /**
@@ -424,20 +424,41 @@ public class BPlusTree {
 
     // Iterator ////////////////////////////////////////////////////////////////
     private class BPlusTreeIterator implements Iterator<RecordId> {
-        // TODO(proj2): Add whatever fields and constructors you want here.
+        // TODO(proj2): Add whatever fields and constructors you want here. Done
+        LeafNode node;
+        Iterator<RecordId> iterator;
+
+        BPlusTreeIterator(LeafNode node) {
+            this.node = node;
+            iterator = this.node.scanAll();
+        }
+
+        BPlusTreeIterator(LeafNode node, DataBox key) {
+            this.node = node;
+            iterator = node.scanGreaterEqual(key);
+        }
 
         @Override
         public boolean hasNext() {
-            // TODO(proj2): implement
+            // TODO(proj2): implement Done
+            if (iterator.hasNext()) return true;
 
-            return false;
+            // next node
+            Optional<LeafNode> rightSibling = node.getRightSibling();
+            if (!rightSibling.isPresent()) return false;
+
+            this.node = rightSibling.get();
+            this.iterator = node.scanAll();
+
+            return true;
         }
 
         @Override
         public RecordId next() {
-            // TODO(proj2): implement
+            // TODO(proj2): implement Done
+            if (!iterator.hasNext()) throw new NoSuchElementException();
 
-            throw new NoSuchElementException();
+            return iterator.next();
         }
     }
 }
