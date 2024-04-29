@@ -162,32 +162,18 @@ class LeafNode extends BPlusNode {
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(proj2): implement DONE
 
-        int n = keys.size();
-        for (int i = 0; i < n + 1; i++) {
-            // 각 key 사이의 값에 해당하는 곳에 데이터 삽입. 중복된 값은 삽입 허용하지 않으므로 key와 같으면 안됨
-            if ((i == 0 || key.compareTo(keys.get(i - 1)) > 0) && (i == n || key.compareTo(keys.get(i)) < 0)) {
-                keys.add(i, key);
-                rids.add(i, rid);
-
-                int d = metadata.getOrder();
-                if (keys.size() > d * 2) { // overflow 발생했으므로 형제 생성 후 원래의 형제와의 사이에 끼워넣기
-                    List<DataBox> rightKeys = keys.subList(d, d * 2 + 1);
-                    List<RecordId> rightRids = rids.subList(d, d * 2 + 1);
-                    this.keys = keys.subList(0, d); // key 재생성
-                    this.rids = rids.subList(0, d); // rids 재생성
-
-                    LeafNode newSibling = new LeafNode(metadata, bufferManager, rightKeys, rightRids, rightSibling, treeContext);
-                    this.rightSibling = Optional.of(newSibling.getPage().getPageNum());
-
-                    sync();
-                    // split key와 함께 반환
-                    return Optional.of(new Pair<>(rightKeys.get(0), newSibling.getPage().getPageNum()));
-                }
-                sync(); // 이걸 해줘야지 testNoOverflowPutsFromDisk() 테스트 코드 통과 가능. 아마 버퍼를 최신 상태로 업데이트 하는 기능
-                return Optional.empty(); // overflow 아닌 삽입
-            }
+        if (keys.contains(key)) {
+            throw new BPlusTreeException("중복된 삽입은 RookieDB에서 허용하지 않습니다.");
         }
-        throw new BPlusTreeException("중복된 삽입은 RookieDB에서 허용하지 않습니다.");
+
+        addPair(key, rid);
+
+        int d = metadata.getOrder();
+        if (isOverflow(2 * d + 1)) { // overflow 발생했으므로 형제 생성 후 원래의 형제와의 사이에 끼워넣기
+            return splitNode();
+        }
+        sync();
+        return Optional.empty(); // overflow 아닌 삽입
     }
 
     // See BPlusNode.bulkLoad.
@@ -197,28 +183,55 @@ class LeafNode extends BPlusNode {
         // TODO(proj2): implement DONE
         while (data.hasNext()) {
             Pair<DataBox, RecordId> pair = data.next();
-            DataBox dataBox = pair.getFirst();
+            DataBox key = pair.getFirst();
             RecordId rid = pair.getSecond();
-            keys.add(dataBox);
-            rids.add(rid);
+
+            addPair(key, rid);
 
             int d = metadata.getOrder();
-            if (keys.size() >= (fillFactor * 2 * d) + 1) { // 특정 구간에 도달하면 split
-                List<DataBox> rightKeys = keys.subList(keys.size() - 1, keys.size());
-                List<RecordId> rightRids = rids.subList(keys.size() - 1, keys.size());
-                this.keys = keys.subList(0, keys.size() - 1);
-                this.rids = rids.subList(0, keys.size());
-
-                LeafNode newSibling = new LeafNode(metadata, bufferManager, rightKeys, rightRids, Optional.empty(), treeContext);
-                this.rightSibling = Optional.of(newSibling.getPage().getPageNum());
-
-                sync();
-                // split key와 함께 반환
-                return Optional.of(new Pair<>(rightKeys.get(0), newSibling.getPage().getPageNum()));
+            if (isOverflow(2 * d * fillFactor + 1)) { // 새로운 노드 생성
+                return makeNewSibling(key, rid);
             }
         }
         sync();
         return Optional.empty();
+    }
+
+    private boolean isOverflow(float range) {
+        return keys.size() == range;
+    }
+
+    private void addPair(DataBox key, RecordId rid) {
+        int index = InnerNode.numLessThan(key, keys);
+        keys.add(index, key);
+        rids.add(index, rid);
+    }
+
+    private Optional<Pair<DataBox, Long>> splitNode() {
+        int d = metadata.getOrder();
+        List<DataBox> rightKeys = keys.subList(d, keys.size());
+        List<RecordId> rightRids = rids.subList(d, rids.size());
+        this.keys = keys.subList(0, d); // key 재생성
+        this.rids = rids.subList(0, d); // rids 재생성
+
+        LeafNode newSibling = new LeafNode(metadata, bufferManager, rightKeys, rightRids, rightSibling, treeContext);
+        this.rightSibling = Optional.of(newSibling.getPage().getPageNum());
+
+        sync();
+        return Optional.of(new Pair<>(rightKeys.get(0), newSibling.getPage().getPageNum())); // split key와 함께 반환
+    }
+
+    private Optional<Pair<DataBox, Long>> makeNewSibling(DataBox key, RecordId rid) {
+        List<DataBox> rightKeys = new ArrayList<>(Arrays.asList(key));
+        List<RecordId> rightRids = new ArrayList<>(Arrays.asList(rid));
+        this.keys.remove(key);
+        this.rids.remove(rid);
+
+        LeafNode newSibling = new LeafNode(metadata, bufferManager, rightKeys, rightRids, rightSibling, treeContext);
+        this.rightSibling = Optional.of(newSibling.getPage().getPageNum());
+
+        sync();
+        return Optional.of(new Pair<>(rightKeys.get(0), newSibling.getPage().getPageNum())); // split key와 함께 반환
     }
 
     // See BPlusNode.remove.
@@ -422,10 +435,6 @@ class LeafNode extends BPlusNode {
     public static LeafNode fromBytes(BPlusTreeMetadata metadata, BufferManager bufferManager,
                                      LockContext treeContext, long pageNum) {
         // TODO(proj2): implement DONE
-        // Note: LeafNode has two constructors. To implement fromBytes be sure to
-        // use the constructor that reuses an existing page instead of fetching a
-        // brand new one.
-
         Page page = bufferManager.fetchPage(treeContext, pageNum);
         Buffer buf = page.getBuffer();
 
