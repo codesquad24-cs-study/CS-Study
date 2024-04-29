@@ -102,32 +102,16 @@ class InnerNode extends BPlusNode {
         Optional<Pair<DataBox, Long>> pairOptional = child.put(key, rid);
 
         if (pairOptional.isPresent()) { // 존재하면 overflow 발생한 것이므로 split key를 inner에 껴줘야 함.
-            Pair<DataBox, Long> pair = pairOptional.get();
-            DataBox dataBox = pair.getFirst();
-            Long pageNum = pair.getSecond();
-
-            int index = InnerNode.numLessThan(dataBox, keys);
-            keys.add(index, dataBox);
-            children.add(index + 1, pageNum);
+            addPair(pairOptional);
 
             int d = metadata.getOrder();
-            if (keys.size() == 2 * d + 1) { // overflow 발생했으므로 형제 생성 후 원래의 형제와의 사이에 끼워넣기
-                DataBox splitKey = keys.get(d);
-                List<DataBox> rightKeys = keys.subList(d + 1, keys.size());
-                List<Long> rightChildren = children.subList(d + 1, children.size());
-                InnerNode innerNode = new InnerNode(metadata, bufferManager, rightKeys, rightChildren, treeContext);
-
-                keys = keys.subList(0, d);
-                children = children.subList(0, d + 1);
-
-                sync();
-                return Optional.of(new Pair<>(splitKey, innerNode.getPage().getPageNum()));
+            if (isOverflow(d)) { // overflow 발생했으므로 형제 생성 후 원래의 형제와의 사이에 끼워넣기
+                // split key와 함께 반환
+                return splitNode();
             }
-            sync();
-            return Optional.empty();
         }
         sync();
-        return Optional.empty();
+        return Optional.empty(); // overflow 아닌 삽입
     }
 
     // See BPlusNode.bulkLoad.
@@ -140,34 +124,48 @@ class InnerNode extends BPlusNode {
             Optional<Pair<DataBox, Long>> pairOptional = rightMostChild.bulkLoad(data, fillFactor);
 
             if (pairOptional.isPresent()) {
-                Pair<DataBox, Long> pair = pairOptional.get();
-                DataBox dataBox = pair.getFirst();
-                Long pageNum = pair.getSecond();
-
-                int index = InnerNode.numLessThan(dataBox, keys);
-                keys.add(index, dataBox);
-                children.add(index + 1, pageNum);
+                addPair(pairOptional);
 
                 int d = metadata.getOrder();
-                if (keys.size() >= 2 * d + 1) {
-                    List<DataBox> rightKeys = keys.subList(d, d * 2 + 1);
-                    List<Long> rightChildren = children.subList(d, d * 2 + 2);
-                    DataBox splitKey = keys.get(d - 1);
-                    keys = keys.subList(0, d - 1);
-                    children = children.subList(0, d);
-                    InnerNode innerNode = new InnerNode(metadata, bufferManager, rightKeys, rightChildren, treeContext);
-
-                    sync();
+                if (isOverflow(d)) { // overflow 발생
                     // split key와 함께 반환
-                    return Optional.of(new Pair<>(splitKey, innerNode.getPage().getPageNum()));
+                    return splitNode();
                 }
                 sync();
-                return Optional.empty(); // overflow 아닌 삽입
+                return Optional.empty();
             }
-            return pairOptional;
         }
         sync();
         return Optional.empty();
+    }
+
+    private boolean isOverflow(int d) {
+        return keys.size() == 2 * d + 1;
+    }
+
+    private void addPair(Optional<Pair<DataBox, Long>> pairOptional) {
+        Pair<DataBox, Long> pair = pairOptional.get();
+        DataBox dataBox = pair.getFirst();
+        Long pageNum = pair.getSecond();
+
+        int index = InnerNode.numLessThan(dataBox, keys);
+        keys.add(index, dataBox);
+        children.add(index + 1, pageNum);
+    }
+
+    private Optional<Pair<DataBox, Long>> splitNode() {
+        int d = metadata.getOrder();
+        DataBox splitKey = keys.get(d);
+
+        List<DataBox> rightKeys = keys.subList(d + 1, keys.size());
+        List<Long> rightChildren = children.subList(d + 1, children.size());
+        InnerNode innerNode = new InnerNode(metadata, bufferManager, rightKeys, rightChildren, treeContext);
+
+        keys = keys.subList(0, d);
+        children = children.subList(0, d + 1);
+
+        sync();
+        return Optional.of(new Pair<>(splitKey, innerNode.getPage().getPageNum()));
     }
 
     // See BPlusNode.remove.
