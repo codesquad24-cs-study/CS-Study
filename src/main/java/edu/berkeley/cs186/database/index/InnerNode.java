@@ -81,18 +81,19 @@ class InnerNode extends BPlusNode {
     // See BPlusNode.get.
     @Override
     public LeafNode get(DataBox key) {
-        // TODO(proj2): implement
+        // TODO(proj2): implement Done
+        int where = numLessThanEqual(key, keys);
 
-        return null;
+        return getChild(where).get(key);
     }
 
     // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf() {
-        assert(children.size() > 0);
-        // TODO(proj2): implement
+        assert (children.size() > 0);
+        // TODO(proj2): implement Done
 
-        return null;
+        return getChild(0).getLeftmostLeaf();
     }
 
     // See BPlusNode.put.
@@ -115,9 +116,10 @@ class InnerNode extends BPlusNode {
     // See BPlusNode.remove.
     @Override
     public void remove(DataBox key) {
-        // TODO(proj2): implement
+        // TODO(proj2): implement Done
 
-        return;
+        LeafNode leafNode = get(key);
+        leafNode.remove(key);
     }
 
     // Helpers /////////////////////////////////////////////////////////////////
@@ -288,7 +290,7 @@ class InnerNode extends BPlusNode {
             long childPageNum = child.getPage().getPageNum();
             lines.add(child.toDot());
             lines.add(String.format("  \"node%d\":f%d -> \"node%d\";",
-                                    pageNum, i, childPageNum));
+                    pageNum, i, childPageNum));
         }
 
         return String.join("\n", lines);
