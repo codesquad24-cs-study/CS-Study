@@ -119,12 +119,8 @@ class InnerNode extends BPlusNode {
         if (!promoteInfo.isPresent()) return promoteInfo;
 
         // overflow from child node-> put 'promoted node' to this
-        Optional<Pair<DataBox, Long>> thisPromoteInfo = putToThis(promoteInfo.get());
-
         // overflow from this node
-        if (thisPromoteInfo.isPresent()) return thisPromoteInfo;
-
-        return bulkLoad(data, fillFactor); // 한번 더
+        return putToThis(promoteInfo.get());
     }
 
     private Optional<Pair<DataBox, Long>> putToThis(Pair<DataBox, Long> promoteInfo) {
