@@ -86,7 +86,15 @@ public class BNLJOperator extends JoinOperator {
          * You may find QueryOperator#getBlockIterator useful here.
          */
         private void fetchNextLeftBlock() {
-            // TODO(proj3_part1): implement
+            // TODO(proj3_part1): implement DONE
+            if (!leftSourceIterator.hasNext()) { // 더 이상 레코드가 없으면 아무 작업도 수행하지 않음
+                return;
+            }
+
+            // backtracking iterator로 설정
+            leftBlockIterator = getBlockIterator(leftSourceIterator, getLeftSource().getSchema(), numBuffers - 2);
+            leftBlockIterator.markNext(); // 안해주면 reset()에서 error
+            leftRecord = leftBlockIterator.next();
         }
 
         /**
@@ -100,7 +108,14 @@ public class BNLJOperator extends JoinOperator {
          * You may find QueryOperator#getBlockIterator useful here.
          */
         private void fetchNextRightPage() {
-            // TODO(proj3_part1): implement
+            // TODO(proj3_part1): implement DONE
+            if (!rightSourceIterator.hasNext()) {  // 더 이상 레코드가 없으면 아무 작업도 수행하지 않음
+                return;
+            }
+
+            // backtracking iterator로 설정
+            rightPageIterator = getBlockIterator(rightSourceIterator, getRightSource().getSchema(), 1);
+            rightPageIterator.markNext();
         }
 
         /**
@@ -112,8 +127,36 @@ public class BNLJOperator extends JoinOperator {
          * of JoinOperator).
          */
         private Record fetchNextRecord() {
-            // TODO(proj3_part1): implement
-            return null;
+            // TODO(proj3_part1): implement DONE
+
+            Record rightRecord;
+            while (true) {
+                if (!rightPageIterator.hasNext()) { // 오른쪽 페이지 반복자에 산출할 값이 있는 경우는 바로 통과
+                    if (leftBlockIterator.hasNext()) {
+                        // 오른쪽 페이지 반복자에는 산출할 값이 없지만 왼쪽 블록 반복자에는 산출된 값이 있는 경우
+                        // 즉, 위에서 오른쪽 끝까지 간 후 한 페이지 내에서 왼쪽 위로 이동 가능
+                        this.leftRecord = leftBlockIterator.next();
+                        rightPageIterator.reset();
+                    } else if (rightSourceIterator.hasNext()) {
+                        // 오른쪽 페이지와 왼쪽 블록 반복자 모두 산출할 값이 없지만 오른쪽 페이지가 있는 경우
+                        // 즉, 한 페이지 내에서 왼쪽 블록의 반복자가 끝날 때까지 이동을 다 한후 오른쪽 페이지로 이동하여 다시 오른쪽으로 계속 이동 가능
+                        leftBlockIterator.reset();
+                        this.leftRecord = leftBlockIterator.next();
+                        fetchNextRightPage();
+                    } else if (leftSourceIterator.hasNext()) {
+                        // 위의 세가지 경우에 모두 해당되지는 않지만 조인할 레코드가 있는 경우
+                        // 즉, 마지막 페이지(제일 오른쪽 페이지) 내에서 왼쪽 위(왼쪽 블록의 반복자)로 이동 가능
+                        rightSourceIterator.reset();
+                        fetchNextLeftBlock();
+                        fetchNextRightPage();
+                    } else { //  조인할 레코드가 더 이상 없는 경우
+                        return null;
+                    }
+                }
+                rightRecord = rightPageIterator.next();
+                if (compare(this.leftRecord, rightRecord) == 0) break;
+            }
+            return this.leftRecord.concat(rightRecord);
         }
 
         /**
