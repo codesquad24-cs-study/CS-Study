@@ -446,6 +446,7 @@ public class BPlusTree {
 
         BPlusTreeIterator(LeafNode node) {
             this.node = node;
+            this.key = null;
             this.iterator = this.node.scanAll();
         }
 
