@@ -86,8 +86,15 @@ public class SortOperator extends QueryOperator {
      * iterator
      */
     public Run sortRun(Iterator<Record> records) {
-        // TODO(proj3_part1): implement
-        return null;
+        // TODO(proj3_part1): implement Done
+
+        List<Record> recordList = new ArrayList<>();
+        while (records.hasNext()) recordList.add(records.next());
+        recordList.sort(new RecordComparator());
+
+        Run sortedRun = new Run(transaction , getSchema());
+        sortedRun.addAll(recordList);
+        return sortedRun;
     }
 
     /**
@@ -107,8 +114,19 @@ public class SortOperator extends QueryOperator {
      */
     public Run mergeSortedRuns(List<Run> runs) {
         assert (runs.size() <= this.numBuffers - 1);
-        // TODO(proj3_part1): implement
-        return null;
+        // TODO(proj3_part1): implement Done
+
+        List<Record> recordList = new ArrayList<>();
+        for(Run run : runs){
+            for (Record record : run) {
+                recordList.add(record);
+            }
+        }
+        recordList.sort(new RecordComparator());
+
+        Run sortedRun = new Run(transaction , getSchema());
+        sortedRun.addAll(recordList);
+        return sortedRun;
     }
 
     /**
@@ -132,8 +150,16 @@ public class SortOperator extends QueryOperator {
      * @return a list of sorted runs obtained by merging the input runs
      */
     public List<Run> mergePass(List<Run> runs) {
-        // TODO(proj3_part1): implement
-        return Collections.emptyList();
+        // TODO(proj3_part1): implement Done
+
+        List<Run> mergedRuns = new ArrayList<>();
+        int len = runs.size();
+        int maxResultSize = numBuffers - 1;
+        for (int i = 0; i + maxResultSize <= len ; i += maxResultSize) {
+            List<Run> part = runs.subList(i, Math.min(len, i + maxResultSize));
+            mergedRuns.add(mergeSortedRuns(part));
+        }
+        return mergedRuns;
     }
 
     /**
@@ -148,8 +174,20 @@ public class SortOperator extends QueryOperator {
         // Iterator over the records of the relation we want to sort
         Iterator<Record> sourceIterator = getSource().iterator();
 
-        // TODO(proj3_part1): implement
-        return makeRun(); // TODO(proj3_part1): replace this!
+        // TODO(proj3_part1): implement Done
+        List<Run> sortedRuns = new ArrayList<>();
+
+        // getBlockIterator method of the QueryOperator class useful
+        while (sourceIterator.hasNext()) {
+            sortedRuns.add(sortRun(getBlockIterator(sourceIterator, getSchema(), numBuffers)));
+        }
+
+        // 1개가 될 때까지 병합
+        while (sortedRuns.size() > 1) {
+            sortedRuns = mergePass(sortedRuns);
+        }
+
+        return sortedRuns.get(0);
     }
 
     /**
