@@ -40,7 +40,7 @@ public class BNLJOperator extends JoinOperator {
         int numLeftPages = getLeftSource().estimateStats().getNumPages();
         int numRightPages = getRightSource().estimateIOCost();
         return ((int) Math.ceil((double) numLeftPages / (double) usableBuffers)) * numRightPages +
-               getLeftSource().estimateIOCost();
+                getLeftSource().estimateIOCost();
     }
 
     /**
@@ -48,7 +48,7 @@ public class BNLJOperator extends JoinOperator {
      * Look over the implementation in SNLJOperator if you want to get a feel
      * for the fetchNextRecord() logic.
      */
-    private class BNLJIterator implements Iterator<Record>{
+    private class BNLJIterator implements Iterator<Record> {
         // Iterator over all the records of the left source
         private Iterator<Record> leftSourceIterator;
         // Iterator over all the records of the right source
@@ -86,7 +86,10 @@ public class BNLJOperator extends JoinOperator {
          * You may find QueryOperator#getBlockIterator useful here.
          */
         private void fetchNextLeftBlock() {
-            // TODO(proj3_part1): implement
+            // TODO(proj3_part1): implement Done
+            leftBlockIterator = getBlockIterator(leftSourceIterator, getLeftSource().getSchema(), numBuffers - 2);
+            leftBlockIterator.markNext();
+            leftRecord = leftBlockIterator.next();
         }
 
         /**
@@ -100,7 +103,9 @@ public class BNLJOperator extends JoinOperator {
          * You may find QueryOperator#getBlockIterator useful here.
          */
         private void fetchNextRightPage() {
-            // TODO(proj3_part1): implement
+            // TODO(proj3_part1): implement Done
+            rightPageIterator = getBlockIterator(rightSourceIterator, getRightSource().getSchema(), 1);
+            rightPageIterator.markNext();
         }
 
         /**
@@ -112,9 +117,44 @@ public class BNLJOperator extends JoinOperator {
          * of JoinOperator).
          */
         private Record fetchNextRecord() {
-            // TODO(proj3_part1): implement
-            return null;
+            // TODO(proj3_part1): implement Done?
+            Record rightRecord;
+            while (true) {
+                if (rightPageIterator.hasNext()) {
+                }
+                // Case 2: rightPageIterator는 반환할 값이 없지만 leftBlockIterator는 값이 있는 경우
+                else if (leftBlockIterator.hasNext()) {
+                    leftRecord = leftBlockIterator.next();
+                    rightPageIterator.reset();
+                }
+
+                // Case 3: rightPageIterator, leftBlockIterator 모두 반환할 값이 없지만 rightPage가 더 있는 경우
+                else if (rightSourceIterator.hasNext()) {
+                    leftBlockIterator.reset();
+                    leftRecord = leftBlockIterator.next();
+                    fetchNextRightPage();
+                }
+
+                // Case 4 : rightPageIterator, leftBlockIterator 모두 반환할 값이 없고 , rightPage도 더 없지만 , leftBlock은 남은 경우
+                else if (leftSourceIterator.hasNext()) {
+                    fetchNextLeftBlock();
+                    rightSourceIterator.reset();
+                    fetchNextRightPage();
+                }
+
+                // 모든 경우가 만족되지 않으면 반환할 레코드가 더 이상 없음
+                else {
+                    return null;
+                }
+
+                // Case 1: rightPageIterator가 반환할 값이 있는 경우
+                rightRecord = rightPageIterator.next();
+                if (compare(leftRecord, rightRecord) == 0) {
+                    return leftRecord.concat(rightRecord);
+                }
+            }
         }
+
 
         /**
          * @return true if this iterator has another record to yield, otherwise
