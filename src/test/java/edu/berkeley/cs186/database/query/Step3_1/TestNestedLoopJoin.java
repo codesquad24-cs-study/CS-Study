@@ -1,4 +1,4 @@
-package edu.berkeley.cs186.database.query;
+package edu.berkeley.cs186.database.query.Step3_1;
 
 import edu.berkeley.cs186.database.Database;
 import edu.berkeley.cs186.database.TestUtils;
@@ -9,6 +9,7 @@ import edu.berkeley.cs186.database.concurrency.DummyLockContext;
 import edu.berkeley.cs186.database.databox.*;
 import edu.berkeley.cs186.database.io.DiskSpaceManager;
 import edu.berkeley.cs186.database.memory.Page;
+import edu.berkeley.cs186.database.query.*;
 import edu.berkeley.cs186.database.query.join.BNLJOperator;
 import edu.berkeley.cs186.database.query.join.PNLJOperator;
 import edu.berkeley.cs186.database.query.join.SNLJOperator;
@@ -135,7 +136,7 @@ public class TestNestedLoopJoin {
 
             startCountIOs();
 
-            // Constructing the the operator should incur no extra IOs
+            // Constructing the operator should incur no extra IOs
             JoinOperator joinOperator = new SNLJOperator(leftSourceOperator, rightSourceOperator, "int", "int",
                     transaction.getTransactionContext());
             checkIOs(0);

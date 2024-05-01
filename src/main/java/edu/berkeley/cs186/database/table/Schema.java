@@ -145,7 +145,7 @@ public class Schema {
     /**
      * @param other
      * @return Concatenates two schema together, returning a new schema
-     * containing the the fields of this schema immediately followed by the
+     * containing the fields of this schema immediately followed by the
      * fields of `other`
      */
     public Schema concat(Schema other) {
