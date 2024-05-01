@@ -1,16 +1,16 @@
-package edu.berkeley.cs186.database.query;
+package edu.berkeley.cs186.database.query.Step3_1;
 
 import edu.berkeley.cs186.database.Database;
 import edu.berkeley.cs186.database.TestUtils;
 import edu.berkeley.cs186.database.TimeoutScaling;
 import edu.berkeley.cs186.database.Transaction;
-import edu.berkeley.cs186.database.categories.HiddenTests;
 import edu.berkeley.cs186.database.categories.Proj3Part1Tests;
 import edu.berkeley.cs186.database.categories.Proj3Tests;
 import edu.berkeley.cs186.database.categories.PublicTests;
 import edu.berkeley.cs186.database.concurrency.DummyLockContext;
 import edu.berkeley.cs186.database.io.DiskSpaceManager;
 import edu.berkeley.cs186.database.memory.Page;
+import edu.berkeley.cs186.database.query.*;
 import edu.berkeley.cs186.database.query.join.SortMergeOperator;
 import edu.berkeley.cs186.database.table.Record;
 import org.junit.After;

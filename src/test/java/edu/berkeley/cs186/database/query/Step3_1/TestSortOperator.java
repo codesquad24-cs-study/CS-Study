@@ -1,4 +1,4 @@
-package edu.berkeley.cs186.database.query;
+package edu.berkeley.cs186.database.query.Step3_1;
 
 import edu.berkeley.cs186.database.*;
 import edu.berkeley.cs186.database.categories.HiddenTests;
@@ -10,6 +10,8 @@ import edu.berkeley.cs186.database.concurrency.DummyLockContext;
 import edu.berkeley.cs186.database.databox.Type;
 import edu.berkeley.cs186.database.io.DiskSpaceManager;
 import edu.berkeley.cs186.database.memory.Page;
+import edu.berkeley.cs186.database.query.SortOperator;
+import edu.berkeley.cs186.database.query.TestSourceOperator;
 import edu.berkeley.cs186.database.query.disk.Run;
 import edu.berkeley.cs186.database.table.Record;
 import edu.berkeley.cs186.database.table.Schema;

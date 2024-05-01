@@ -1,4 +1,4 @@
-package edu.berkeley.cs186.database.query;
+package edu.berkeley.cs186.database.query.Step3_1;
 
 import edu.berkeley.cs186.database.Database;
 import edu.berkeley.cs186.database.TestUtils;
@@ -9,6 +9,7 @@ import edu.berkeley.cs186.database.categories.PublicTests;
 import edu.berkeley.cs186.database.categories.SystemTests;
 import edu.berkeley.cs186.database.common.Pair;
 import edu.berkeley.cs186.database.databox.Type;
+import edu.berkeley.cs186.database.query.TestSourceOperator;
 import edu.berkeley.cs186.database.query.join.GHJOperator;
 import edu.berkeley.cs186.database.query.join.SHJOperator;
 import edu.berkeley.cs186.database.table.Record;
