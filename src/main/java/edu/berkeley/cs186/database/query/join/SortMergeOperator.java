@@ -20,8 +20,8 @@ public class SortMergeOperator extends JoinOperator {
                              String rightColumnName,
                              TransactionContext transaction) {
         super(prepareLeft(transaction, leftSource, leftColumnName),
-              prepareRight(transaction, rightSource, rightColumnName),
-              leftColumnName, rightColumnName, transaction, JoinType.SORTMERGE);
+                prepareRight(transaction, rightSource, rightColumnName),
+                leftColumnName, rightColumnName, transaction, JoinType.SORTMERGE);
         this.stats = this.estimateStats();
     }
 
@@ -75,22 +75,21 @@ public class SortMergeOperator extends JoinOperator {
 
     /**
      * An implementation of Iterator that provides an iterator interface for this operator.
-     *    See lecture slides.
+     * See lecture slides.
      *
      * Before proceeding, you should read and understand SNLJOperator.java
-     *    You can find it in the same directory as this file.
+     * You can find it in the same directory as this file.
      *
      * Word of advice: try to decompose the problem into distinguishable sub-problems.
-     *    This means you'll probably want to add more methods than those given (Once again,
-     *    SNLJOperator.java might be a useful reference).
-     *
+     * This means you'll probably want to add more methods than those given (Once again,
+     * SNLJOperator.java might be a useful reference).
      */
     private class SortMergeIterator implements Iterator<Record> {
         /**
-        * Some member variables are provided for guidance, but there are many possible solutions.
-        * You should implement the solution that's best for you, using any member variables you need.
-        * You're free to use these member variables, but you're not obligated to.
-        */
+         * Some member variables are provided for guidance, but there are many possible solutions.
+         * You should implement the solution that's best for you, using any member variables you need.
+         * You're free to use these member variables, but you're not obligated to.
+         */
         private Iterator<Record> leftIterator;
         private BacktrackingIterator<Record> rightIterator;
         private Record leftRecord;
@@ -139,8 +138,53 @@ public class SortMergeOperator extends JoinOperator {
          * or null if there are no more records to join.
          */
         private Record fetchNextRecord() {
-            // TODO(proj3_part1): implement
-            return null;
+            // TODO(proj3_part1): implement Done?
+            if (leftRecord == null) return null;
+            Record result;
+            if (!this.marked) {
+                try {
+                    setRecords();
+                } catch (NoSuchElementException noMoreRecords) {
+                    return null;
+                }
+
+                rightIterator.markPrev();
+                this.marked = true;
+            }
+
+            // left == right 시 병합해 반환
+            if (compare(leftRecord, rightRecord) == 0) {
+                result = leftRecord.concat(rightRecord);
+
+                if (rightIterator.hasNext()) rightRecord = rightIterator.next();
+                else resetAndMoveNext();
+
+                return result;
+            }
+            
+            // 다를때 -> 다음으로 넘기고 재귀 호출
+            resetAndMoveNext();
+            this.marked = false;
+            
+            return fetchNextRecord();
+        }
+
+        private void resetAndMoveNext() {
+            rightIterator.reset();
+            rightRecord = rightIterator.next();
+            if (leftIterator.hasNext()) leftRecord = leftIterator.next();
+            else leftRecord = null;
+        }
+
+        private void setRecords() {
+            while (compare(leftRecord, rightRecord) < 0) { // 왼쪽이 더 작다 -> 넘김
+                if (!leftIterator.hasNext()) throw new NoSuchElementException("left");
+                leftRecord = leftIterator.next();
+            }
+            while (compare(leftRecord, rightRecord) > 0) {
+                if (!rightIterator.hasNext()) throw new NoSuchElementException("right");
+                rightRecord = rightIterator.next();
+            }
         }
 
         @Override
