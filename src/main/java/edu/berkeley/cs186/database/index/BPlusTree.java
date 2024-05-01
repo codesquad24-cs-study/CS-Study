@@ -456,22 +456,20 @@ public class BPlusTree {
         @Override
         public boolean hasNext() {
             // TODO(proj2): Done
-            return currentIterator.hasNext() || currentNode.getRightSibling().isPresent();
+            while (!currentIterator.hasNext() && currentNode.getRightSibling().isPresent()) {
+                currentNode = currentNode.getRightSibling().get();
+                currentIterator = currentNode.scanAll();
+            }
+            return currentIterator.hasNext();
         }
 
         @Override
         public RecordId next() {
             // TODO(proj2): Done
-            if (currentIterator.hasNext()) {
-                return currentIterator.next();
+            if (!hasNext()) {
+                throw new NoSuchElementException();
             }
-            Optional<LeafNode> rightSibling = currentNode.getRightSibling();
-            if (rightSibling.isPresent()) {
-                currentNode = rightSibling.get();
-                currentIterator = currentNode.scanAll();
-                return currentIterator.next();
-            }
-            throw new NoSuchElementException();
+            return currentIterator.next();
         }
     }
 }
