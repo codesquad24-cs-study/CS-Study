@@ -86,8 +86,17 @@ public class SortOperator extends QueryOperator {
      * iterator
      */
     public Run sortRun(Iterator<Record> records) {
-        // TODO(proj3_part1): implement
-        return null;
+        // TODO(proj3_part1): implement DONE
+
+        List<Record> sortedRecord = new ArrayList<>();
+        while (records.hasNext()) {
+            sortedRecord.add(records.next());
+        }
+        sortedRecord.sort(new RecordComparator());
+
+        Run run = makeRun();
+        run.addAll(sortedRecord);
+        return run;
     }
 
     /**
@@ -105,10 +114,36 @@ public class SortOperator extends QueryOperator {
      *
      * @return a single sorted run obtained by merging the input runs
      */
-    public Run mergeSortedRuns(List<Run> runs) {
-        assert (runs.size() <= this.numBuffers - 1);
-        // TODO(proj3_part1): implement
-        return null;
+    public Run mergeSortedRuns(List<Run> sortedRuns) {
+        assert (sortedRuns.size() <= this.numBuffers - 1);
+        // TODO(proj3_part1): implement DONE
+
+        // sortedRuns안에 있는 run들의 Iterator들을 하나로 합치기
+        List<BacktrackingIterator<Record>> iterators = new ArrayList<>();
+        for (Run sortedRun : sortedRuns) {
+            iterators.add(sortedRun.iterator());
+        }
+
+        Run run = makeRun();
+        PriorityQueue<Pair<Record, Integer>> pq = new PriorityQueue<>(new RecordPairComparator());
+        for (BacktrackingIterator<Record> iterator : iterators) {
+            if (iterator.hasNext()) {
+                pq.add(new Pair<>(iterator.next(), iterators.indexOf(iterator)));
+            }
+        }
+
+        while (!pq.isEmpty()) {
+            Pair<Record, Integer> pair = pq.poll(); // 가장 작은 값을 가진 레코드 꺼내기
+            Record record = pair.getFirst();
+            int second = pair.getSecond();
+            run.add(record);
+
+            if (iterators.get(second).hasNext()) {
+                // 다음으로 읽어올 레코드가 남아있다면 우선순위 큐에 추가
+                pq.add(new Pair<>(iterators.get(second).next(), second));
+            }
+        }
+        return run;
     }
 
     /**
@@ -132,8 +167,19 @@ public class SortOperator extends QueryOperator {
      * @return a list of sorted runs obtained by merging the input runs
      */
     public List<Run> mergePass(List<Run> runs) {
-        // TODO(proj3_part1): implement
-        return Collections.emptyList();
+        // TODO(proj3_part1): implement DONE
+
+        List<Run> mergedRuns = new ArrayList<>();
+        int mergeUnit = numBuffers - 1;
+        for (int start = 0; start + mergeUnit <= runs.size(); start += mergeUnit) {
+            int end = calculateEnd(runs.size(), start + mergeUnit);
+            mergedRuns.add(mergeSortedRuns(runs.subList(start, end)));
+        }
+        return mergedRuns; // runs를 병합하여 반환
+    }
+
+    private int calculateEnd(int size, int nextEnd) {
+        return Math.min(size, nextEnd);
     }
 
     /**
@@ -148,8 +194,24 @@ public class SortOperator extends QueryOperator {
         // Iterator over the records of the relation we want to sort
         Iterator<Record> sourceIterator = getSource().iterator();
 
-        // TODO(proj3_part1): implement
-        return makeRun(); // TODO(proj3_part1): replace this!
+        /**
+         * 소스 운영자의 레코드에 대해 외부 병합 정렬을 수행합니다.
+         * 정렬된 실행의 초기 세트를 생성하는 데 여기에서 QueryOperator 클래스의 getBlockIterator 메소드가 유용할 수 있습니다.
+         * 보고:
+         * 정렬된 순서로 소스 운영자의 모든 레코드를 포함하는 단일 실행입니다.
+         */
+
+        // TODO(proj3_part1): implement DONE
+
+        List<Run> sortedRuns = new ArrayList<>();
+        while (sourceIterator.hasNext()) { // 정렬
+            sortedRuns.add(sortRun(QueryOperator.getBlockIterator(sourceIterator, getSchema(), numBuffers)));
+        }
+
+        while (sortedRuns.size() > 1) { // 병합
+            sortedRuns = mergePass(sortedRuns);
+        }
+        return sortedRuns.get(0);  // TODO(proj3_part1): replace this! DONE
     }
 
     /**
