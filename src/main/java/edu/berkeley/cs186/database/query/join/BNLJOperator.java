@@ -121,6 +121,8 @@ public class BNLJOperator extends JoinOperator {
             Record rightRecord;
             while (true) {
                 if (rightPageIterator.hasNext()) {
+                    // Case 1: rightPageIterator가 반환할 값이 있는 경우
+                    // 바로 Join 확인
                 }
                 // Case 2: rightPageIterator는 반환할 값이 없지만 leftBlockIterator는 값이 있는 경우
                 else if (leftBlockIterator.hasNext()) {
@@ -147,7 +149,7 @@ public class BNLJOperator extends JoinOperator {
                     return null;
                 }
 
-                // Case 1: rightPageIterator가 반환할 값이 있는 경우
+                // Join
                 rightRecord = rightPageIterator.next();
                 if (compare(leftRecord, rightRecord) == 0) {
                     return leftRecord.concat(rightRecord);
