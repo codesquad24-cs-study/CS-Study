@@ -737,8 +737,7 @@ public class QueryPlan {
         // Pass 1: For each table, find the lowest cost QueryOperator to access the table.
         Map<Set<String>, QueryOperator> pass1Map = new HashMap<>();
         for (String table : this.tableNames) {
-            Set<String> singeTableSet = new HashSet<>();
-            singeTableSet.add(table);
+            Set<String> singeTableSet = new HashSet<>(Collections.singletonList(table));
 
             //Construct a mapping of each table name to its lowest cost operator.
             pass1Map.put(singeTableSet, minCostSingleAccess(table));
