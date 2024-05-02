@@ -122,7 +122,7 @@ public class GHJOperator extends JoinOperator {
                 "fit in B-2 pages of memory."
             );
         }
-        // TODO(proj3_part1): implement the building and probing stage
+        // TODO(proj3_part1): implement the building and probing stage Done
         // You shouldn't refer to any variable starting with "left" or "right"
         // here, use the "build" and "probe" variables we set up for you.
         // Check out how SHJOperator implements this function if you feel stuck.
