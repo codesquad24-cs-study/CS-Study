@@ -139,8 +139,57 @@ public class SortMergeOperator extends JoinOperator {
          * or null if there are no more records to join.
          */
         private Record fetchNextRecord() {
-            // TODO(proj3_part1): implement
+            // TODO(proj3_part1): implement Done
+            while (leftRecord != null && rightRecord != null) {
+                if (!marked) {
+                    while (compare(leftRecord, rightRecord) < 0) {
+                        if (!leftIterator.hasNext()) {
+                            return null;
+                        }
+                        leftRecord = advance(leftIterator);
+                        if (leftRecord == null) {
+                            return null;
+                        }
+                    }
+                    while (compare(leftRecord, rightRecord) > 0) {
+                        if (!rightIterator.hasNext()) {
+                            return null;
+                        }
+                        rightRecord = advance(rightIterator);
+                        if (rightRecord == null) {
+                            return null;
+                        }
+                    }
+                    // s의 시작점 마킹
+                    marked = true;
+                    rightIterator.markPrev();
+                }
+
+                if (compare(leftRecord, rightRecord) == 0) {
+                    Record result = leftRecord.concat(rightRecord);
+                    rightRecord = advance(rightIterator);
+                    if (rightRecord == null) {
+                        rightIterator.reset();
+                        leftRecord = advance(leftIterator);
+                        rightRecord = advance(rightIterator);
+                    }
+                    return result;
+                } else {
+                    rightIterator.reset();
+                    leftRecord = advance(leftIterator);
+                    rightRecord = advance(rightIterator);
+                    marked = false;
+                }
+            }
             return null;
+        }
+
+
+        private Record advance(Iterator<Record> recordIterator) {
+            if (!recordIterator.hasNext()) {
+                return null;
+            }
+            return recordIterator.next();
         }
 
         @Override
