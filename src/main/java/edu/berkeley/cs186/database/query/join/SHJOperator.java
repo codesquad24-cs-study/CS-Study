@@ -112,8 +112,8 @@ public class SHJOperator extends JoinOperator {
             if (!hashTable.containsKey(rightJoinValue)) continue;
             // We have to join the right record with each left record with
             // a matching key
-            for (Record lRecord : hashTable.get(rightJoinValue)) {
-                Record joinedRecord = lRecord.concat(rightRecord);
+            for (Record leftRecord : hashTable.get(rightJoinValue)) {
+                Record joinedRecord = leftRecord.concat(rightRecord);
                 // Accumulate joined records in this.joinedRecords
                 this.joinedRecords.add(joinedRecord);
             }
@@ -135,8 +135,8 @@ public class SHJOperator extends JoinOperator {
         // Partition records into left and right
         this.partition(partitions, leftRecords);
 
-        for (int i = 0; i < partitions.length; i++) {
-            buildAndProbe(partitions[i], rightRecords);
+        for (Partition partition : partitions) {
+            buildAndProbe(partition, rightRecords);
         }
     }
 
@@ -148,7 +148,7 @@ public class SHJOperator extends JoinOperator {
      */
     private Partition[] createPartitions() {
         int usableBuffers = this.numBuffers - 1;
-        Partition partitions[] = new Partition[usableBuffers];
+        Partition[] partitions = new Partition[usableBuffers];
         for (int i = 0; i < usableBuffers; i++) {
             Schema schema = getLeftSource().getSchema();
             partitions[i] = new Partition(getTransaction(), schema);

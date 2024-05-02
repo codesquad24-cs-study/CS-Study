@@ -207,7 +207,7 @@ public class GHJOperator extends JoinOperator {
      */
     private Partition[] createPartitions(boolean left) {
         int usableBuffers = this.numBuffers - 1;
-        Partition partitions[] = new Partition[usableBuffers];
+        Partition[] partitions = new Partition[usableBuffers];
         for (int i = 0; i < usableBuffers; i++) {
             partitions[i] = createPartition(left);
         }
