@@ -94,9 +94,7 @@ public class SortOperator extends QueryOperator {
         }
         sortedRecord.sort(new RecordComparator());
 
-        Run run = makeRun();
-        run.addAll(sortedRecord);
-        return run;
+        return makeRun(sortedRecord);
     }
 
     /**
