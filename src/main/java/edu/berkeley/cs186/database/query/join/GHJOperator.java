@@ -263,8 +263,8 @@ public class GHJOperator extends JoinOperator {
         // TODO(proj3_part1): populate leftRecords and rightRecords such that Pass
         // SHJ breaks when trying to join them but not GHJ
 
-        // SHJ 는 실패하지만 GHJ 는 성공하는 경우 ??????
-        for (int i = 0; i < 200; i++) {
+        // SHJ : partition (6-1) *  buildAndProve (6-2) * record 8 = 160 이 최대
+        for (int i = 0; i < 161; i++) {
             leftRecords.add(createRecord(i));
             rightRecords.add(createRecord(i));
         }
@@ -289,7 +289,7 @@ public class GHJOperator extends JoinOperator {
         ArrayList<Record> rightRecords = new ArrayList<>();
         // TODO(proj3_part1): populate leftRecords and rightRecords such that GHJ breaks Done
 
-        // (6 - 2) * 8 = 32
+        // 4번 partition 까지 양쪽이 다 fitsInMemory false
         for (int i = 0; i < 33; i++) {
             leftRecords.add(createRecord(0));
             rightRecords.add(createRecord(0));
