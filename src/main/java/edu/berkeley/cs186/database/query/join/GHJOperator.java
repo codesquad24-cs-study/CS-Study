@@ -278,7 +278,7 @@ public class GHJOperator extends JoinOperator {
     public static Pair<List<Record>, List<Record>> getBreakGHJInputs() {
         ArrayList<Record> leftRecords = new ArrayList<>();
         ArrayList<Record> rightRecords = new ArrayList<>();
-        // TODO(proj3_part1): populate leftRecords and rightRecords such that GHJ breaks
+        // TODO(proj3_part1): populate leftRecords and rightRecords such that GHJ breaks Done
         int recordsCount = 200;
         for (int i = 0; i < recordsCount; i++) {
             leftRecords.add(createRecord(0));
