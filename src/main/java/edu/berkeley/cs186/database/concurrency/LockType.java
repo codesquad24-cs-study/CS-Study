@@ -1,5 +1,8 @@
 package edu.berkeley.cs186.database.concurrency;
 
+import java.util.Arrays;
+import java.util.List;
+
 /**
  * Utility methods to track the relationships between different lock types.
  */
@@ -21,9 +24,19 @@ public enum LockType {
         if (a == null || b == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
+        // TODO(proj4_part1): implement DONE
+        LockType[] lockTypes = {a, b};
+        LockType[] reversedLockTypes = {b, a};
 
-        return false;
+        // false를 반환하는 조합. true를 반환하는 조합이 false를 반환하는 조합보다 훨씬 많아 이것과 비교하도록 함.
+        List<LockType[]> nonCompatibleList = Arrays.asList(
+                new LockType[]{LockType.S, LockType.X},
+                new LockType[]{LockType.S, LockType.IX},
+                new LockType[]{LockType.S, LockType.SIX},
+                new LockType[]{LockType.X, LockType.X});
+
+        // false를 반환하는 조합에 포함되어 있으면 false, true를 반환하는 조합에 포함되어 있으면 true.
+        return !(containsPair(nonCompatibleList, lockTypes) || containsPair(nonCompatibleList, reversedLockTypes));
     }
 
     /**
@@ -53,9 +66,18 @@ public enum LockType {
         if (parentLockType == null || childLockType == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
+        // TODO(proj4_part1): implement DONE
+        LockType[] lockTypes = {parentLockType, childLockType};
 
-        return false;
+        // false를 반환하는 조합.
+        List<LockType[]> nonCompatibleList = Arrays.asList(
+                new LockType[]{LockType.IS, LockType.X},
+                new LockType[]{LockType.IS, LockType.IX},
+                new LockType[]{LockType.IS, LockType.SIX});
+
+        // false를 반환하는 조합에 포함되어 있거나 부모만 LockType이 NL인 조합은 false.
+        // true를 반환하는 조합에 포함되어 있으면 true.
+        return !(containsPair(nonCompatibleList, lockTypes) || isNLLeftButNotRight(parentLockType, childLockType));
     }
 
     /**
@@ -68,9 +90,32 @@ public enum LockType {
         if (required == null || substitute == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
+        // TODO(proj4_part1): implement DONE
 
-        return false;
+        LockType[] lockTypes = {substitute, required};
+
+        // false를 반환하는 조합.
+        List<LockType[]> nonCompatibleList = Arrays.asList(
+                new LockType[]{LockType.S, LockType.X},
+                new LockType[]{LockType.IS, LockType.S},
+                new LockType[]{LockType.IS, LockType.X},
+                new LockType[]{LockType.IS, LockType.IX},
+                new LockType[]{LockType.IX, LockType.S},
+                new LockType[]{LockType.IX, LockType.X},
+                new LockType[]{LockType.SIX, LockType.X});
+
+        // false를 반환하는 조합에 포함되어 있거나 substitute만 LockType이 NL인 조합은 false.
+        // true를 반환하는 조합에 포함되어 있으면 true.
+        return !(containsPair(nonCompatibleList, lockTypes) || isNLLeftButNotRight(substitute, required));
+    }
+
+    private static boolean containsPair(List<LockType[]> lockTypesList, LockType[] lockTypes) {
+        return lockTypesList.stream()
+                .anyMatch(pair -> Arrays.equals(pair, lockTypes));
+    }
+
+    private static boolean isNLLeftButNotRight(LockType left, LockType right) {
+        return left.equals(LockType.NL) && !right.equals(LockType.NL);
     }
 
     /**
