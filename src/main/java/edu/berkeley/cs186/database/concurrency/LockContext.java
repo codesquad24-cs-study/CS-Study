@@ -96,8 +96,20 @@ public class LockContext {
     public void acquire(TransactionContext transaction, LockType lockType)
             throws InvalidLockException, DuplicateLockRequestException {
         // TODO(proj4_part2): implement
+        checkReadOnly();
 
+        if (parent != null && !LockType.canBeParentLock(parent.getEffectiveLockType(transaction), lockType)) {
+            throw new InvalidLockException("invalid request");
+        }
+
+        lockman.acquire(transaction, name, lockType);
         return;
+    }
+
+    // If a LockContext is readonly, acquire/release/promote/escalate should
+    // throw an UnsupportedOperationException.
+    private void checkReadOnly() throws UnsupportedOperationException{
+        if(readonly) throw new UnsupportedOperationException("readOnly");
     }
 
     /**
@@ -114,7 +126,9 @@ public class LockContext {
     public void release(TransactionContext transaction)
             throws NoLockHeldException, InvalidLockException {
         // TODO(proj4_part2): implement
+        checkReadOnly();
 
+        lockman.release(transaction, name);
         return;
     }
 
@@ -140,7 +154,9 @@ public class LockContext {
     public void promote(TransactionContext transaction, LockType newLockType)
             throws DuplicateLockRequestException, NoLockHeldException, InvalidLockException {
         // TODO(proj4_part2): implement
+        checkReadOnly();
 
+        lockman.promote(transaction, name, newLockType);
         return;
     }
 
@@ -179,7 +195,7 @@ public class LockContext {
      */
     public void escalate(TransactionContext transaction) throws NoLockHeldException {
         // TODO(proj4_part2): implement
-
+        checkReadOnly();
         return;
     }
 
@@ -202,6 +218,9 @@ public class LockContext {
     public LockType getEffectiveLockType(TransactionContext transaction) {
         if (transaction == null) return LockType.NL;
         // TODO(proj4_part2): implement
+
+        parentContext();
+
         return LockType.NL;
     }
 
