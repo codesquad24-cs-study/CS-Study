@@ -1,6 +1,9 @@
 package edu.berkeley.cs186.database.concurrency;
 
-import com.sun.tools.javac.util.List;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Utility methods to track the relationships between different lock types.
@@ -25,10 +28,10 @@ public enum LockType {
         }
         // TODO(proj4_part1): implement Done
 
-        List<LockType> compatibleWithIS = List.of(S, IS, IX, SIX, NL);
-        List<LockType> compatibleWithIX = List.of(IS, IX, NL);
-        List<LockType> compatibleWithS = List.of(S, IS, NL);
-        List<LockType> compatibleWithSIX = List.of(IS, NL);
+        List<LockType> compatibleWithIS = new ArrayList<>(Arrays.asList(S, IS, IX, SIX, NL));
+        List<LockType> compatibleWithIX = new ArrayList<>(Arrays.asList(IS, IX, NL));
+        List<LockType> compatibleWithS = new ArrayList<>(Arrays.asList(S, IS, NL));
+        List<LockType> compatibleWithSIX = new ArrayList<>(Arrays.asList(IS, NL));
 
         switch (a) {
             case NL: return true;
@@ -72,8 +75,8 @@ public enum LockType {
 
         if(!parentLockType.isIntent()) return childLockType == NL;
 
-        List<LockType> childOfIS = List.of(S, IS);
-        List<LockType> childOfSIX = List.of(IX, X, SIX, NL);
+        List<LockType> childOfIS = new ArrayList<>(Arrays.asList(S, IS, NL));
+        List<LockType> childOfSIX = new ArrayList<>(Arrays.asList(X, IX, NL));
 
         switch (parentLockType) {
             case IS: return childOfIS.contains(childLockType);
