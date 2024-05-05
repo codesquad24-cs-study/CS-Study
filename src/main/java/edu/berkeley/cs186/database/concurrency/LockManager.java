@@ -62,9 +62,8 @@ public class LockManager {
             // TODO(proj4_part1): implement DONE
 
             // 기존의 lock들이 except id를 가졌거나 호환 가능하다면 허용
-            // 즉, except id를 가지지 않으면서 호환되지 않는 lock들이 locks안에 전혀 없으면 true, 하나라도 있으면 false.
             return locks.stream()
-                    .noneMatch(lock -> lock.transactionNum != except && !LockType.compatible(lock.lockType, lockType));
+                    .allMatch(lock -> lock.transactionNum == except || LockType.compatible(lock.lockType, lockType));
         }
 
         /**
@@ -105,7 +104,8 @@ public class LockManager {
             // TODO(proj4_part1): implement DONE
             locks.remove(lock); // lock 해제
             long transactionNum = lock.transactionNum;
-            transactionLocks.get(transactionNum).remove(lock);
+            transactionLocks.remove(transactionNum);
+            processQueue();
         }
 
         /**
@@ -130,12 +130,15 @@ public class LockManager {
             // TODO(proj4_part1): implement DONE
             for (LockRequest lockRequest : waitingQueue) {
                 // 잠금 부여가 불가능하다면 중지
-                if (checkCompatible(lockRequest.lock.lockType, lockRequest.lock.transactionNum)) {
+                if (!checkCompatible(lockRequest.lock.lockType, lockRequest.lock.transactionNum)) {
                     return;
                 }
-                LockRequest first = waitingQueue.removeFirst(); // 대기큐에서 제일 첫번째 요청 꺼내기
-                first.releasedLocks.forEach(this::releaseLock);
+
+                // 대기큐에서 제일 첫번째 요청 꺼내기
+                LockRequest first = waitingQueue.removeFirst();
                 grantOrUpdateLock(first.lock);
+                // 혹시 모르므로 가지고 있는 lock들 release
+                first.releasedLocks.forEach(lock -> release(lockRequest.transaction, lock.name));
                 first.transaction.unblock();
             }
         }
@@ -201,11 +204,7 @@ public class LockManager {
 
         boolean shouldBlock = false;
         synchronized (this) {
-            LockType transactionLockType = getLockType(transaction, name);
-            if (transactionLockType == lockType) {
-                throw new DuplicateLockRequestException("잠금이 이미 transaction에 의해 보유되어 있고 해제되지 않았습니다.");
-            }
-
+            throwExceptionIfLockRequestIsDuplicate(transaction, name, lockType);
             ResourceEntry resourceEntry = getResourceEntry(name);
             long transactionNum = transaction.getTransNum();
             // name에 대한 lockType 잠금을 획득
@@ -220,7 +219,6 @@ public class LockManager {
                         continue;
                     }
                     release(transaction, resourceName);
-                    resourceEntry.processQueue();
                 }
             } else { // 새 잠금이 리소스에 대한 다른 트랜잭션의 잠금과 호환되지 않으면
                 shouldBlock = true; // 트랜잭션 차단
@@ -260,16 +258,38 @@ public class LockManager {
      */
     public void acquire(TransactionContext transaction, ResourceName name,
                         LockType lockType) throws DuplicateLockRequestException {
-        // TODO(proj4_part1): implement
-        // You may modify any part of this method. You are not required to keep all your
-        // code within the given synchronized block and are allowed to move the
-        // synchronized block elsewhere if you wish.
+        // TODO(proj4_part1): implement DONE
+
         boolean shouldBlock = false;
         synchronized (this) {
-            
+            throwExceptionIfLockRequestIsDuplicate(transaction, name, lockType);
+            ResourceEntry resourceEntry = getResourceEntry(name);
+            long transactionNum = transaction.getTransNum();
+            // name에 대한 lockType 잠금을 획득
+            Lock lock = new Lock(name, lockType, transactionNum);
+            boolean isCompatible = resourceEntry.checkCompatible(lockType, transactionNum);
+            boolean isEmptyQueue = resourceEntry.waitingQueue.isEmpty();
+
+            if (isCompatible && isEmptyQueue) {
+                resourceEntry.grantOrUpdateLock(lock);
+            } else {
+                shouldBlock = true; // 트랜잭션 차단
+                LockRequest lockRequest = new LockRequest(transaction, lock);
+                resourceEntry.addToQueue(lockRequest, false); // 요청이 대기열 뒤에 배치
+                transaction.prepareBlock();
+            }
         }
+
         if (shouldBlock) {
             transaction.block();
+        }
+    }
+
+    private void throwExceptionIfLockRequestIsDuplicate(TransactionContext transaction, ResourceName name,
+                                                        LockType lockType) {
+        LockType transactionLockType = getLockType(transaction, name);
+        if (transactionLockType == lockType) {
+            throw new DuplicateLockRequestException("잠금이 이미 transaction에 의해 보유되어 있고 해제되지 않았습니다.");
         }
     }
 
