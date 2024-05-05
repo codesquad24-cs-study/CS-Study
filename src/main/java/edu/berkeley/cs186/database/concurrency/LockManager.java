@@ -3,6 +3,7 @@ package edu.berkeley.cs186.database.concurrency;
 import edu.berkeley.cs186.database.TransactionContext;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * LockManager maintains the bookkeeping for what transactions have what locks
@@ -58,8 +59,12 @@ public class LockManager {
          * the resource.
          */
         public boolean checkCompatible(LockType lockType, long except) {
-            // TODO(proj4_part1): implement
-            return false;
+            // TODO(proj4_part1): implement DONE
+
+            // 기존의 lock들이 except id를 가졌거나 호환 가능하다면 허용
+            // 즉, except id를 가지지 않으면서 호환되지 않는 lock들이 locks안에 전혀 없으면 true, 하나라도 있으면 false.
+            return locks.stream()
+                    .noneMatch(lock -> lock.transactionNum != except && !LockType.compatible(lock.lockType, lockType));
         }
 
         /**
@@ -68,8 +73,28 @@ public class LockManager {
          * lock.
          */
         public void grantOrUpdateLock(Lock lock) {
-            // TODO(proj4_part1): implement
-            return;
+            // TODO(proj4_part1): implement DONE
+
+            // 잠금이 호환된다고 가정하므로 바로 lock 부여
+            long transactionNum = lock.transactionNum;
+            for (Lock existedLock : locks) {
+                if (existedLock.transactionNum == transactionNum) { // 이미 'lock'이 있는 경우 리소스에 대한 잠금을 업데이트
+                    existedLock.lockType = lock.lockType;
+                    updateLock(lock);
+                    return;
+                }
+            }
+            locks.add(lock);
+            transactionLocks.put(transactionNum, Collections.singletonList(lock)); // 트랜잭션에 'lock' 잠금을 부여
+        }
+
+        private void updateLock(Lock lock) {
+            List<Lock> updateLocks = transactionLocks.get(lock.transactionNum).stream()
+                    .filter(existedLock -> existedLock.name.equals(lock.name)).collect(Collectors.toList());
+
+            for (Lock existedLock : updateLocks) {
+                existedLock.lockType = lock.lockType;
+            }
         }
 
         /**
@@ -77,8 +102,10 @@ public class LockManager {
          * lock has been granted before.
          */
         public void releaseLock(Lock lock) {
-            // TODO(proj4_part1): implement
-            return;
+            // TODO(proj4_part1): implement DONE
+            locks.remove(lock); // lock 해제
+            long transactionNum = lock.transactionNum;
+            transactionLocks.get(transactionNum).remove(lock);
         }
 
         /**
@@ -86,8 +113,12 @@ public class LockManager {
          * the end otherwise.
          */
         public void addToQueue(LockRequest request, boolean addFront) {
-            // TODO(proj4_part1): implement
-            return;
+            // TODO(proj4_part1): implement DONE
+            if (addFront) {
+                waitingQueue.addFirst(request);
+                return;
+            }
+            waitingQueue.addLast(request);
         }
 
         /**
@@ -96,18 +127,29 @@ public class LockManager {
          * granted, the transaction that made the request can be unblocked.
          */
         private void processQueue() {
-            Iterator<LockRequest> requests = waitingQueue.iterator();
-
-            // TODO(proj4_part1): implement
-            return;
+            // TODO(proj4_part1): implement DONE
+            for (LockRequest lockRequest : waitingQueue) {
+                // 잠금 부여가 불가능하다면 중지
+                if (checkCompatible(lockRequest.lock.lockType, lockRequest.lock.transactionNum)) {
+                    return;
+                }
+                LockRequest first = waitingQueue.removeFirst(); // 대기큐에서 제일 첫번째 요청 꺼내기
+                first.releasedLocks.forEach(this::releaseLock);
+                grantOrUpdateLock(first.lock);
+                first.transaction.unblock();
+            }
         }
 
         /**
          * Gets the type of lock `transaction` has on this resource.
          */
         public LockType getTransactionLockType(long transaction) {
-            // TODO(proj4_part1): implement
-            return LockType.NL;
+            // TODO(proj4_part1): implement DONE
+            // transaction이랑 transactionNum이 일치하는 lock이 없으면 NL 리턴
+            return locks.stream()
+                    .filter(lock -> lock.transactionNum == transaction)
+                    .map(lock -> lock.lockType).findFirst()
+                    .orElse(LockType.NL);
         }
 
         @Override
@@ -155,17 +197,54 @@ public class LockManager {
     public void acquireAndRelease(TransactionContext transaction, ResourceName name,
                                   LockType lockType, List<ResourceName> releaseNames)
             throws DuplicateLockRequestException, NoLockHeldException {
-        // TODO(proj4_part1): implement
-        // You may modify any part of this method. You are not required to keep
-        // all your code within the given synchronized block and are allowed to
-        // move the synchronized block elsewhere if you wish.
+        // TODO(proj4_part1): implement DONE
+
         boolean shouldBlock = false;
         synchronized (this) {
-            
+            LockType transactionLockType = getLockType(transaction, name);
+            if (transactionLockType == lockType) {
+                throw new DuplicateLockRequestException("잠금이 이미 transaction에 의해 보유되어 있고 해제되지 않았습니다.");
+            }
+
+            ResourceEntry resourceEntry = getResourceEntry(name);
+            long transactionNum = transaction.getTransNum();
+            // name에 대한 lockType 잠금을 획득
+            Lock lock = new Lock(name, lockType, transactionNum);
+            if (resourceEntry.checkCompatible(lockType, transactionNum)) {
+                resourceEntry.grantOrUpdateLock(lock);
+
+                // 트랜잭션이 보유하고 있는 releaseNames에 대한 모든 잠금을 해제
+                for (ResourceName resourceName : releaseNames) {
+                    // name에 대한 잠금 획득 시간은 변경하지 않는다.
+                    if (resourceName.equals(name)) {
+                        continue;
+                    }
+                    release(transaction, resourceName);
+                    resourceEntry.processQueue();
+                }
+            } else { // 새 잠금이 리소스에 대한 다른 트랜잭션의 잠금과 호환되지 않으면
+                shouldBlock = true; // 트랜잭션 차단
+                List<Lock> releasedLocks = getReleasedLocks(releaseNames, transactionNum);
+                LockRequest lockRequest = new LockRequest(transaction, lock, releasedLocks);
+
+                // 요청을 리소스 대기열의 맨 앞에 배치
+                resourceEntry.addToQueue(lockRequest, true);
+                transaction.prepareBlock();
+            }
         }
+
         if (shouldBlock) {
             transaction.block();
         }
+    }
+
+    private List<Lock> getReleasedLocks(List<ResourceName> releaseNames, long transactionNum) {
+        List<Lock> releasedLocks = new ArrayList<>();
+        for (ResourceName resourceName : releaseNames) {
+            LockType locktype = getResourceEntry(resourceName).getTransactionLockType(transactionNum);
+            releasedLocks.add(new Lock(resourceName, locktype, transactionNum));
+        }
+        return releasedLocks;
     }
 
     /**
@@ -206,10 +285,18 @@ public class LockManager {
      */
     public void release(TransactionContext transaction, ResourceName name)
             throws NoLockHeldException {
-        // TODO(proj4_part1): implement
-        // You may modify any part of this method.
+        // TODO(proj4_part1): implement DONE
         synchronized (this) {
-            
+            ResourceEntry resourceEntry = getResourceEntry(name);
+            long transactionNum = transaction.getTransNum();
+
+            // transaction이 releaseNames에 있는 하나 이상의 이름에 대한 잠금을 유지하지 않는 경우
+            if (resourceEntry.getTransactionLockType(transactionNum) == LockType.NL) {
+                throw new NoLockHeldException("transaction은 releaseNames에서 하나 이상의 잠금을 유지해야 합니다.");
+            }
+            LockType lockType = resourceEntry.getTransactionLockType(transactionNum);
+            Lock lock = new Lock(name, lockType, transactionNum);
+            resourceEntry.releaseLock(lock); // 잠금 해제
         }
     }
 
@@ -253,9 +340,10 @@ public class LockManager {
      * held.
      */
     public synchronized LockType getLockType(TransactionContext transaction, ResourceName name) {
-        // TODO(proj4_part1): implement
+        // TODO(proj4_part1): implement DONE
         ResourceEntry resourceEntry = getResourceEntry(name);
-        return LockType.NL;
+        long transactionNum = transaction.getTransNum();
+        return resourceEntry.getTransactionLockType(transactionNum); // transaction이 name에 대해 가지고 있는 잠금 유형을 반환
     }
 
     /**
