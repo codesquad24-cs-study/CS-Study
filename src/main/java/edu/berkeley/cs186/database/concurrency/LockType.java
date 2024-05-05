@@ -1,5 +1,7 @@
 package edu.berkeley.cs186.database.concurrency;
 
+import com.sun.tools.javac.util.List;
+
 /**
  * Utility methods to track the relationships between different lock types.
  */
@@ -21,9 +23,22 @@ public enum LockType {
         if (a == null || b == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
+        // TODO(proj4_part1): implement Done
 
-        return false;
+        List<LockType> compatibleWithIS = List.of(S, IS, IX, SIX, NL);
+        List<LockType> compatibleWithIX = List.of(IS, IX, NL);
+        List<LockType> compatibleWithS = List.of(S, IS, NL);
+        List<LockType> compatibleWithSIX = List.of(IS, NL);
+
+        switch (a) {
+            case NL: return true;
+            case IS: return compatibleWithIS.contains(b);
+            case IX: return compatibleWithIX.contains(b);
+            case S : return compatibleWithS.contains(b);
+            case SIX: return compatibleWithSIX.contains(b);
+            case X : return (b == NL);
+            default: throw new UnsupportedOperationException("bad lock type");
+        }
     }
 
     /**
@@ -53,9 +68,19 @@ public enum LockType {
         if (parentLockType == null || childLockType == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
+        // TODO(proj4_part1): implement Done
 
-        return false;
+        if(!parentLockType.isIntent()) return childLockType == NL;
+
+        List<LockType> childOfIS = List.of(S, IS);
+        List<LockType> childOfSIX = List.of(IX, X, SIX, NL);
+
+        switch (parentLockType) {
+            case IS: return childOfIS.contains(childLockType);
+            case IX: return true;
+            case SIX: return childOfSIX.contains(childLockType);
+            default: throw new UnsupportedOperationException("bad lock type");
+        }
     }
 
     /**
@@ -68,9 +93,17 @@ public enum LockType {
         if (required == null || substitute == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
+        // TODO(proj4_part1): implement Done
 
-        return false;
+        switch (substitute) {
+            case NL: return required == NL;
+            case IS: return required == NL || required == IS;
+            case IX: return required == NL || required == IS || required == IX;
+            case S : return required == NL || required == IS || required == S;
+            case SIX : return !(required == X);
+            case X : return true;
+            default: throw new UnsupportedOperationException("bad lock type");
+        }
     }
 
     /**
