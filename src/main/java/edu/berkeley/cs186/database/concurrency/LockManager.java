@@ -285,14 +285,6 @@ public class LockManager {
         }
     }
 
-    private void throwExceptionIfLockRequestIsDuplicate(TransactionContext transaction, ResourceName name,
-                                                        LockType lockType) {
-        LockType transactionLockType = getLockType(transaction, name);
-        if (transactionLockType == lockType) {
-            throw new DuplicateLockRequestException("잠금이 이미 transaction에 의해 보유되어 있고 해제되지 않았습니다.");
-        }
-    }
-
     /**
      * Release `transaction`'s lock on `name`. Error checking must be done
      * before the lock is released.
@@ -310,10 +302,7 @@ public class LockManager {
             ResourceEntry resourceEntry = getResourceEntry(name);
             long transactionNum = transaction.getTransNum();
 
-            // transaction이 releaseNames에 있는 하나 이상의 이름에 대한 잠금을 유지하지 않는 경우
-            if (resourceEntry.getTransactionLockType(transactionNum) == LockType.NL) {
-                throw new NoLockHeldException("transaction은 releaseNames에서 하나 이상의 잠금을 유지해야 합니다.");
-            }
+            throwExceptionIfNoLockIsHeld(resourceEntry, transactionNum);
             LockType lockType = resourceEntry.getTransactionLockType(transactionNum);
             Lock lock = new Lock(name, lockType, transactionNum);
             resourceEntry.releaseLock(lock); // 잠금 해제
@@ -344,14 +333,50 @@ public class LockManager {
     public void promote(TransactionContext transaction, ResourceName name,
                         LockType newLockType)
             throws DuplicateLockRequestException, NoLockHeldException, InvalidLockException {
-        // TODO(proj4_part1): implement
-        // You may modify any part of this method.
+        // TODO(proj4_part1): implement DONE
+
         boolean shouldBlock = false;
         synchronized (this) {
-            
+            ResourceEntry resourceEntry = getResourceEntry(name);
+            long transactionNum = transaction.getTransNum();
+            throwExceptionIfLockRequestIsDuplicate(transaction, name, newLockType);
+            throwExceptionIfNoLockIsHeld(resourceEntry, transactionNum);
+            throwExceptionIfLockIsInvalid(resourceEntry, transactionNum, newLockType);
+
+            Lock lock = new Lock(name, newLockType, transactionNum);
+            if (resourceEntry.checkCompatible(newLockType, transactionNum)) {
+                resourceEntry.grantOrUpdateLock(lock);
+            } else {
+                shouldBlock = true;
+                LockRequest request = new LockRequest(transaction, lock);
+                resourceEntry.addToQueue(request, true); // 맨 앞에 추가
+                transaction.prepareBlock();
+            }
         }
         if (shouldBlock) {
             transaction.block();
+        }
+    }
+
+    private void throwExceptionIfLockRequestIsDuplicate(TransactionContext transaction, ResourceName name,
+                                                        LockType lockType) {
+        LockType transactionLockType = getLockType(transaction, name);
+        if (transactionLockType == lockType) {
+            throw new DuplicateLockRequestException("잠금이 이미 transaction에 의해 보유되어 있고 해제되지 않았습니다.");
+        }
+    }
+
+    private void throwExceptionIfNoLockIsHeld(ResourceEntry resourceEntry, long transactionNum) {
+        // transaction이 releaseNames에 있는 하나 이상의 이름에 대한 잠금을 유지하지 않는 경우
+        if (resourceEntry.getTransactionLockType(transactionNum) == LockType.NL) {
+            throw new NoLockHeldException("transaction은 releaseNames에서 하나 이상의 잠금을 유지해야 합니다.");
+        }
+    }
+
+    private void throwExceptionIfLockIsInvalid(ResourceEntry resourceEntry, long transactionNum, LockType newLockType) {
+        // 요청된 잠금 유형이 승격이 아닌 경우
+        if (!LockType.substitutable(newLockType, resourceEntry.getTransactionLockType(transactionNum))) {
+            throw new InvalidLockException("the new lock type is not substitutable for the old lock");
         }
     }
 
