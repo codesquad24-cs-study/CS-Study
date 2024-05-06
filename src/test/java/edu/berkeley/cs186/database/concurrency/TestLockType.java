@@ -29,15 +29,15 @@ public class TestLockType {
      * ----+-----+-----+-----+-----+-----+-----
      * NL  |  T  |  T  |  T  |  T  |  T  |  T
      * ----+-----+-----+-----+-----+-----+-----
-     * IS  |  T  |  T  |  T  |  T  |     |
+     * IS  |  T  |  T  |  T  |  T  |  T  |  F
      * ----+-----+-----+-----+-----+-----+-----
-     * IX  |  T  |  T  |  T  |  F  |     |
+     * IX  |  T  |  T  |  T  |  F  |  F  |  F
      * ----+-----+-----+-----+-----+-----+-----
      * S   |  T  |  T  |  F  |  T  |  F  |  F
      * ----+-----+-----+-----+-----+-----+-----
-     * SIX |  T  |     |     |  F  |     |
+     * SIX |  T  |  T  |  F  |  F  |  F  |  F
      * ----+-----+-----+-----+-----+-----+-----
-     * X   |  T  |     |     |  F  |     |  F
+     * X   |  T  |  F  |  F  |  F  |  F  |  F
      * ----+-----+-----+-----+-----+-----+-----
      *
      * The filled in cells are covered by the public tests.
@@ -83,17 +83,73 @@ public class TestLockType {
     @Category(PublicTests.class)
     public void testCompatibleIntent() {
         // Intent locks are compatible with each other
+        assertTrue(LockType.compatible(LockType.IS, LockType.NL));
         assertTrue(LockType.compatible(LockType.IS, LockType.IS));
         assertTrue(LockType.compatible(LockType.IS, LockType.IX));
+        assertTrue(LockType.compatible(LockType.IS, LockType.S));
+        assertTrue(LockType.compatible(LockType.IS, LockType.SIX));
+        assertFalse(LockType.compatible(LockType.IS, LockType.X));
+
+        // reversed
+        assertTrue(LockType.compatible(LockType.NL, LockType.IS));
+        assertTrue(LockType.compatible(LockType.IS, LockType.IS));
+        assertTrue(LockType.compatible(LockType.IX, LockType.IS));
+        assertTrue(LockType.compatible(LockType.S, LockType.IS));
+        assertTrue(LockType.compatible(LockType.SIX, LockType.IS));
+        assertFalse(LockType.compatible(LockType.X, LockType.IS));
+
+        assertTrue(LockType.compatible(LockType.IX, LockType.NL));
         assertTrue(LockType.compatible(LockType.IX, LockType.IS));
         assertTrue(LockType.compatible(LockType.IX, LockType.IX));
+        assertFalse(LockType.compatible(LockType.IX, LockType.S));
+        assertFalse(LockType.compatible(LockType.IX, LockType.SIX));
+        assertFalse(LockType.compatible(LockType.IX, LockType.X));
+
+        // reversed
+        assertTrue(LockType.compatible(LockType.NL, LockType.IX));
+        assertTrue(LockType.compatible(LockType.IS, LockType.IX));
+        assertTrue(LockType.compatible(LockType.IX, LockType.IX));
+        assertFalse(LockType.compatible(LockType.S, LockType.IX));
+        assertFalse(LockType.compatible(LockType.SIX, LockType.IX));
+        assertFalse(LockType.compatible(LockType.X, LockType.IX));
     }
 
     @Test
     @Category(PublicTests.class)
     public void testCompatibleXandX() {
-        // X locks are incompatible with X locks
+        assertTrue(LockType.compatible(LockType.X, LockType.NL));
+        assertFalse(LockType.compatible(LockType.X, LockType.IS));
+        assertFalse(LockType.compatible(LockType.X, LockType.IX));
+        assertFalse(LockType.compatible(LockType.X, LockType.S));
+        assertFalse(LockType.compatible(LockType.X, LockType.SIX));
         assertFalse(LockType.compatible(LockType.X, LockType.X));
+
+        // reversed
+        assertTrue(LockType.compatible(LockType.NL, LockType.X));
+        assertFalse(LockType.compatible(LockType.IS, LockType.X));
+        assertFalse(LockType.compatible(LockType.IX, LockType.X));
+        assertFalse(LockType.compatible(LockType.S, LockType.X));
+        assertFalse(LockType.compatible(LockType.SIX, LockType.X));
+        assertFalse(LockType.compatible(LockType.X, LockType.X));
+    }
+
+    @Test
+    @Category(PublicTests.class)
+    public void testCompatibleSIX() {
+        assertTrue(LockType.compatible(LockType.SIX, LockType.NL));
+        assertTrue(LockType.compatible(LockType.SIX, LockType.IS));
+        assertFalse(LockType.compatible(LockType.SIX, LockType.IX));
+        assertFalse(LockType.compatible(LockType.SIX, LockType.S));
+        assertFalse(LockType.compatible(LockType.SIX, LockType.SIX));
+        assertFalse(LockType.compatible(LockType.SIX, LockType.X));
+
+        // reversed
+        assertTrue(LockType.compatible(LockType.NL, LockType.SIX));
+        assertTrue(LockType.compatible(LockType.IS, LockType.SIX));
+        assertFalse(LockType.compatible(LockType.IX, LockType.SIX));
+        assertFalse(LockType.compatible(LockType.S, LockType.SIX));
+        assertFalse(LockType.compatible(LockType.SIX, LockType.SIX));
+        assertFalse(LockType.compatible(LockType.X, LockType.SIX));
     }
 
     @Test
@@ -121,11 +177,11 @@ public class TestLockType {
      * ----+-----+-----+-----+-----+-----+-----
      * IX  |  T  |  T  |  T  |  T  |  T  |  T
      * ----+-----+-----+-----+-----+-----+-----
-     * S   |  T  |     |     |     |     |
+     * S   |  T  |  F  |  F  |  F  |  F  |  F
      * ----+-----+-----+-----+-----+-----+-----
-     * SIX |  T  |     |     |     |     |
+     * SIX |  T  |  F  |  T  |  F  |  F  |  T
      * ----+-----+-----+-----+-----+-----+-----
-     * X   |  T  |     |     |     |     |
+     * X   |  T  |  F  |  F  |  F  |  F  |  F
      * ----+-----+-----+-----+-----+-----+-----
      *
      * The filled in cells are covered by the public test.
@@ -160,15 +216,35 @@ public class TestLockType {
     @Test
     @Category(PublicTests.class)
     public void testISParent() {
-        // IS can be the parent of IS, S, and NL
-        assertTrue(LockType.canBeParentLock(LockType.IS, LockType.IS));
-        assertTrue(LockType.canBeParentLock(LockType.IS, LockType.S));
-        assertTrue(LockType.canBeParentLock(LockType.IS, LockType.NL));
+        assertTrue(LockType.canBeParentLock(LockType.S, LockType.NL));
+        assertFalse(LockType.canBeParentLock(LockType.S, LockType.IS));
+        assertFalse(LockType.canBeParentLock(LockType.S, LockType.IX));
+        assertFalse(LockType.canBeParentLock(LockType.S, LockType.S));
+        assertFalse(LockType.canBeParentLock(LockType.S, LockType.SIX));
+        assertFalse(LockType.canBeParentLock(LockType.S, LockType.X));
 
-        // IS cannot be the parent of IX, X, or SIX
-        assertFalse(LockType.canBeParentLock(LockType.IS, LockType.IX));
-        assertFalse(LockType.canBeParentLock(LockType.IS, LockType.X));
-        assertFalse(LockType.canBeParentLock(LockType.IS, LockType.SIX));
+        assertTrue(LockType.canBeParentLock(LockType.X, LockType.NL));
+        assertFalse(LockType.canBeParentLock(LockType.X, LockType.IS));
+        assertFalse(LockType.canBeParentLock(LockType.X, LockType.IX));
+        assertFalse(LockType.canBeParentLock(LockType.X, LockType.S));
+        assertFalse(LockType.canBeParentLock(LockType.X, LockType.SIX));
+        assertFalse(LockType.canBeParentLock(LockType.X, LockType.X));
+
+        assertTrue(LockType.canBeParentLock(LockType.SIX, LockType.NL));
+        assertFalse(LockType.canBeParentLock(LockType.SIX, LockType.IS));
+        assertTrue(LockType.canBeParentLock(LockType.SIX, LockType.IX));
+        assertFalse(LockType.canBeParentLock(LockType.SIX, LockType.S));
+        assertFalse(LockType.canBeParentLock(LockType.SIX, LockType.SIX));
+        assertTrue(LockType.canBeParentLock(LockType.SIX, LockType.X));
+    }
+
+    @Test
+    @Category(PublicTests.class)
+    public void SandXandSIXParent() {
+        // IX can be the parent of any type of lock
+        for (LockType childType : LockType.values()) {
+            assertTrue(LockType.canBeParentLock(LockType.IX, childType));
+        }
     }
 
     /**
@@ -179,15 +255,15 @@ public class TestLockType {
      * ----+-----+-----+-----+-----+-----+-----
      * NL  |  T  |  F  |  F  |  F  |  F  |  F
      * ----+-----+-----+-----+-----+-----+-----
-     * IS  |     |  T  |  F  |  F  |     |  F
+     * IS  |  T  |  T  |  F  |  F  |  F  |  F
      * ----+-----+-----+-----+-----+-----+-----
-     * IX  |     |  T  |  T  |  F  |     |  F
+     * IX  |  T  |  T  |  T  |  F  |  F  |  F
      * ----+-----+-----+-----+-----+-----+-----
-     * S   |     |     |     |  T  |     |  F
+     * S   |  T  |  T  |  F  |  T  |  F  |  F
      * ----+-----+-----+-----+-----+-----+-----
-     * SIX |     |     |     |  T  |     |  F
+     * SIX |  T  |  T  |  T  |  T  |  T  |  F
      * ----+-----+-----+-----+-----+-----+-----
-     * X   |     |     |     |  T  |     |  T
+     * X   |  T  |  T  |  T  |  T  |  T  |  T
      * ----+-----+-----+-----+-----+-----+-----
      *
      * The filled in cells are covered by the public test.
@@ -214,39 +290,44 @@ public class TestLockType {
 
     @Test
     @Category(PublicTests.class)
-    public void testSubstitutableReal() {
-        // You cannot substitute S with IS or IX
-        assertFalse(LockType.substitutable(LockType.IS, LockType.S));
-        assertFalse(LockType.substitutable(LockType.IX, LockType.S));
-
-        // You can substitute S with S, SIX, or X
+    public void testSubstitutableSandXandSIX() {
+        assertTrue(LockType.substitutable(LockType.S, LockType.NL));
+        assertTrue(LockType.substitutable(LockType.S, LockType.IS));
+        assertFalse(LockType.substitutable(LockType.S, LockType.IX));
         assertTrue(LockType.substitutable(LockType.S, LockType.S));
-        assertTrue(LockType.substitutable(LockType.SIX, LockType.S));
-        assertTrue(LockType.substitutable(LockType.X, LockType.S));
-
-        // You cannot substitute X with IS, IX, S, or SIX
-        assertFalse(LockType.substitutable(LockType.IS, LockType.X));
-        assertFalse(LockType.substitutable(LockType.IX, LockType.X));
+        assertFalse(LockType.substitutable(LockType.S, LockType.SIX));
         assertFalse(LockType.substitutable(LockType.S, LockType.X));
-        assertFalse(LockType.substitutable(LockType.SIX, LockType.X));
 
-        // You can substitute X with X
+        assertTrue(LockType.substitutable(LockType.X, LockType.NL));
+        assertTrue(LockType.substitutable(LockType.X, LockType.IS));
+        assertTrue(LockType.substitutable(LockType.X, LockType.IX));
+        assertTrue(LockType.substitutable(LockType.X, LockType.S));
+        assertTrue(LockType.substitutable(LockType.X, LockType.SIX));
         assertTrue(LockType.substitutable(LockType.X, LockType.X));
+
+        assertTrue(LockType.substitutable(LockType.SIX, LockType.NL));
+        assertTrue(LockType.substitutable(LockType.SIX, LockType.IS));
+        assertTrue(LockType.substitutable(LockType.SIX, LockType.IX));
+        assertTrue(LockType.substitutable(LockType.SIX, LockType.S));
+        assertTrue(LockType.substitutable(LockType.SIX, LockType.SIX));
+        assertFalse(LockType.substitutable(LockType.SIX, LockType.X));
     }
 
     @Test
     @Category(PublicTests.class)
     public void testSubstitutableIXandIS() {
-        // You can substitute intent locks with themselves
+        assertTrue(LockType.substitutable(LockType.IS, LockType.NL));
         assertTrue(LockType.substitutable(LockType.IS, LockType.IS));
-        assertTrue(LockType.substitutable(LockType.IX, LockType.IX));
-
-        // IX's privileges are a superset of IS's privileges
-        assertTrue(LockType.substitutable(LockType.IX, LockType.IS));
-
-        // IS's privileges are not a superset of IX's privileges
         assertFalse(LockType.substitutable(LockType.IS, LockType.IX));
+        assertFalse(LockType.substitutable(LockType.IS, LockType.S));
+        assertFalse(LockType.substitutable(LockType.IS, LockType.SIX));
+        assertFalse(LockType.substitutable(LockType.IS, LockType.X));
+
+        assertTrue(LockType.substitutable(LockType.IX, LockType.NL));
+        assertTrue(LockType.substitutable(LockType.IX, LockType.IS));
+        assertTrue(LockType.substitutable(LockType.IX, LockType.IX));
+        assertFalse(LockType.substitutable(LockType.IX, LockType.S));
+        assertFalse(LockType.substitutable(LockType.IX, LockType.SIX));
+        assertFalse(LockType.substitutable(LockType.IX, LockType.X));
     }
-
 }
-
