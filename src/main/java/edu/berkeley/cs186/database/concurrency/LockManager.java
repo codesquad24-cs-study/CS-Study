@@ -365,7 +365,7 @@ public class LockManager {
                     String.format("트랜잭션 %s가 이미 %s을 %s에 hold", transNum, newLockType, name));
             }
             // substitutable하지 않은 경우 예외처리
-            if (!LockType.substitutable(prevLockType, newLockType)) {
+            if (!LockType.substitutable(newLockType, prevLockType)) {
                 throw new InvalidLockException(
                     String.format("새로운 %slock이 %s lock을 대체할 수 없다 ", newLockType, prevLockType));
             }
