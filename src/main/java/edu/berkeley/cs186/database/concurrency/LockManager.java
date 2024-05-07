@@ -354,16 +354,20 @@ public class LockManager {
         synchronized (this) {
             ResourceEntry resourceEntry = getResourceEntry(name);
             LockType prevLockType = resourceEntry.getTransactionLockType(transNum);
-            if (Objects.equals(prevLockType, LockType.NL)) {
-                throw new NoLockHeldException(String.format("No lock has been held on %s by %s", name, transNum));
+
+            // 해당 transaction이 lock을 가지고 있지 않은 경우 예외처리
+            if (prevLockType.equals(LockType.NL)) {
+                throw new NoLockHeldException(String.format("트랜잭션 %s이 %s에 lock을 가지고 있지 않습니다.", transNum, name));
             }
-            if (Objects.equals(prevLockType, newLockType)) {
+            // 이미 newLockType을 가지고 있는 경우 예외처리
+            if (prevLockType.equals(newLockType)) {
                 throw new DuplicateLockRequestException(
-                    String.format("%s has already held the %s lock on %s", transNum, newLockType, name));
+                    String.format("트랜잭션 %s가 이미 %s을 %s에 hold", transNum, newLockType, name));
             }
-            if (LockType.substitutable(prevLockType, newLockType)) {
+            // substitutable하지 않은 경우 예외처리
+            if (!LockType.substitutable(prevLockType, newLockType)) {
                 throw new InvalidLockException(
-                    String.format("Lock %s is not substitutable for %s", newLockType, prevLockType));
+                    String.format("새로운 %slock이 %s lock을 대체할 수 없다 ", newLockType, prevLockType));
             }
             Lock lock = new Lock(name, newLockType, transNum);
             if (resourceEntry.checkCompatible(newLockType, transNum)) {
