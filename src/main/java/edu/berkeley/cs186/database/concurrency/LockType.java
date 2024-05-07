@@ -100,7 +100,7 @@ public enum LockType {
         // TODO(proj4_part1): implement Done
         switch (substitute) {
             case S:
-                return required == S || required == NL;
+                return required == S || required == NL || required == IS;
             case X:
                 return true;
             case IS:
